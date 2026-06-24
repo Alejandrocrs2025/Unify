@@ -1,0 +1,23 @@
+/* Variables de tema */
+:root {
+	--white: #ffffff;
+	--bg-start: #005e59;
+	--bg-end: #00b0a8;
+	--brand-1: #0B3C6D;
+	--brand-2: #3A7DBF;
+	--brand-mid: #00ab91;
+	--brand-darker: #013d4f;
+	--muted: #4a5568;
+	--muted-2: #a0aec0;
+	--border: #e2e8f0;
+	--accent: #4FA9A3;
+	--red: #c0392b;
+	--orange: #e67e22;
+	--green: #27ae60;
+	--bg-rgb: 0,94,89;
+	--brand1-rgb: 11,60,109;
+	--bg-light: #f8fafc;
+}
+
+/* Puedes añadir aquí estilos globales compartidos */
+
