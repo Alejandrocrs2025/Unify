@@ -1,23 +1,67 @@
-/* Variables de tema */
+/* Variables de tema — disponibles para TODOS los componentes */
 :root {
+	/* Colores base */
 	--white: #ffffff;
+	--off-white: #f4faf9;
+	--bg-light: #edf7f5;
+
+	/* Verde (brand principal) */
 	--bg-start: #005e59;
 	--bg-end: #00b0a8;
+	--green-50: #e6f4f2;
+	--green-100: #b3ddd9;
+	--green-400: #00b0a8;
+	--green-500: #009e96;
+	--green-600: #005e59;
+	--green-700: #003d39;
+
+	/* Azul (brand secundario) */
+	--sky-100: #cce8f0;
+	--sky-300: #6ab4d4;
+	--sky-400: #3A7DBF;
+	--sky-500: #2060a8;
+	--sky-600: #0B3C6D;
+
+	/* Aliases usados en Register/Login */
 	--brand-1: #0B3C6D;
 	--brand-2: #3A7DBF;
 	--brand-mid: #00ab91;
 	--brand-darker: #013d4f;
+	--accent: #4FA9A3;
+
+	/* Texto */
+	--text-dark: #0d1f1e;
+	--text-mid: #1e4a47;
+	--text-muted: #5a8a86;
 	--muted: #4a5568;
 	--muted-2: #a0aec0;
-	--border: #e2e8f0;
-	--accent: #4FA9A3;
+
+	/* Bordes y sombras */
+	--border: rgba(0, 94, 89, 0.12);
+	--shadow-sm: 0 2px 12px rgba(0, 94, 89, 0.08);
+	--shadow-md: 0 8px 32px rgba(0, 94, 89, 0.12);
+	--shadow-lg: 0 20px 60px rgba(0, 94, 89, 0.16);
+
+	/* Radios */
+	--radius-sm: 8px;
+	--radius-md: 14px;
+	--radius-lg: 22px;
+	--radius-xl: 32px;
+
+	/* Semánticos (usados en Register) */
 	--red: #c0392b;
 	--orange: #e67e22;
 	--green: #27ae60;
+
+	/* RGB para box-shadow con transparencia */
 	--bg-rgb: 0,94,89;
 	--brand1-rgb: 11,60,109;
-	--bg-light: #f8fafc;
 }
 
-/* Puedes añadir aquí estilos globales compartidos */
+/* Estilos globales compartidos */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; font-size: 16px; }
+body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+img { display: block; max-width: 100%; }
+a { text-decoration: none; }
 

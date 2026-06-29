@@ -459,50 +459,8 @@ onBeforeUnmount(() => {
 })
 </script>
 
-<style>
-
-/* ─── VARIABLES ─────────────────────────────────────────── */
-:root {
-  --white:       #ffffff;
-  --off-white:   #f4faf9;
-  --bg-light:    #edf7f5;
-  --green-50:    #e6f4f2;
-  --green-100:   #b3ddd9;
-  --green-400:   #00b0a8;
-  --green-500:   #009e96;
-  --green-600:   #005e59;
-  --green-700:   #003d39;
-  --sky-100:     #cce8f0;
-  --sky-300:     #6ab4d4;
-  --sky-400:     #3A7DBF;
-  --sky-500:     #2060a8;
-  --sky-600:     #0B3C6D;
-  --text-dark:   #0d1f1e;
-  --text-mid:    #1e4a47;
-  --text-muted:  #5a8a86;
-  --border:      rgba(0, 94, 89, 0.12);
-  --shadow-sm:   0 2px 12px rgba(0, 94, 89, 0.08);
-  --shadow-md:   0 8px 32px rgba(0, 94, 89, 0.12);
-  --shadow-lg:   0 20px 60px rgba(0, 94, 89, 0.16);
-  --radius-sm:   8px;
-  --radius-md:   14px;
-  --radius-lg:   22px;
-  --radius-xl:   32px;
-}
-
-/* ─── RESET ─────────────────────────────────────────────── */
-*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-html { scroll-behavior: smooth; font-size: 16px; }
-img  { display: block; max-width: 100%; }
-a    { text-decoration: none; }
-
-body {
-  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-  background: var(--white);
-  color: var(--text-dark);
-  overflow-x: hidden;
-  line-height: 1.6;
-}
+<style scoped>
+/* ─── VARIABLES (ahora en style.css global — aquí solo se consumen) ─── */
 
 /* ─── UTILIDADES ─────────────────────────────────────────── */
 .container { max-width: 1180px; margin: 0 auto; padding: 0 5vw; }
@@ -575,6 +533,8 @@ h3 { font-size: 1.25rem; font-weight: 600; }
   border-bottom: 1px solid var(--border);
   box-shadow: 0 2px 20px rgba(0, 0, 0, 0.1);
   display: flex; align-items: center;
+  margin-left: 0;
+  gap: 5rem;
 }
 .navbar .container {
   width: 100%; 
@@ -592,6 +552,7 @@ h3 { font-size: 1.25rem; font-weight: 600; }
   object-fit: contain;
   border-radius: 12px;
   flex-shrink: 0;
+  margin-top: 2rem;
 }
 .nav-logo {
   display: inline-flex; 
@@ -604,7 +565,7 @@ h3 { font-size: 1.25rem; font-weight: 600; }
   color: transparent;
   letter-spacing: -0.03em;
   cursor: pointer;
-  margin-right: auto;
+  margin-left: 0;
 }
 .nav-logo span {
   background: linear-gradient(135deg, #0B3C6D 0%, #3A7DBF 100%);

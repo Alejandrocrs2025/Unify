@@ -1,8 +1,8 @@
 <template>
   <div class="page">
-    <header>
+    <header class="main-header">
       <h1><span>U</span>nify</h1>
-      <img src="/img/logo-unify.png" alt="Logo Unify" />
+      <img src="/img/logo-unify.png" alt="Logo Unify" class="main-logo" />
 
       <nav class="navbar" aria-label="Navegación principal">
         <ul class="list">
@@ -33,7 +33,7 @@
       </div>
     </main>
 
-    <footer>
+    <footer class="main-footer">
       © 2026 Unify.web - Todo tu negocio en un solo lugar
     </footer>
   </div>
@@ -106,7 +106,7 @@ const selectRole = async (role) => {
 }
 
 /* Header */
-header {
+.main-header {
   background: rgba(255, 255, 255, 0.95);
   backdrop-filter: blur(10px);
   padding: 1rem 2rem;
@@ -117,7 +117,7 @@ header {
   border: 0;
 }
 
-header h1 {
+.main-header h1 {
   font-size: 2rem;
   font-weight: 700;
   margin-left: 25px;
@@ -125,9 +125,10 @@ header h1 {
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
+  margin-left: 40px;
 }
 
-header h1 span {
+.main-header h1 span {
   background: linear-gradient(135deg, #0B3C6D 0%, #3A7DBF 100%);
   -webkit-background-clip: text;
   background-clip: text;
@@ -135,13 +136,11 @@ header h1 span {
 }
 
 /* Logo */
-img {
+.main-logo {
   width: 40px;
   height: 40px;
-  position: absolute;
-  top: 2.5rem;
-  left: 1rem;
   border-radius: 25px;
+  position: absolute;
 }
 
 /* Navbar */
@@ -231,7 +230,7 @@ main {
   }
 }
 
-footer {
+.main-footer {
   text-align: center;
   padding: 1.5rem;
   background: rgba(255, 255, 255, 0.9);
@@ -241,7 +240,7 @@ footer {
 
 /* Responsive */
 @media (max-width: 768px) {
-  header {
+  .main-header {
     flex-direction: column;
     gap: 1rem;
     padding: 1rem;

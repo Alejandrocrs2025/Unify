@@ -11,7 +11,7 @@
           <li @click="currentView = 'products'" :class="{ active: currentView === 'products' }">
             <i class="fas fa-box"></i> Productos
           </li>
-          <li @click="currentView = 'orders'" :class="{ active: currentView === 'orders' }">
+          <li @click="goToOrders" :class="{ active: false }">
             <i class="fas fa-shopping-bag"></i> Mis Pedidos
           </li>
           <li @click="currentView = 'profile'" :class="{ active: currentView === 'profile' }">
@@ -127,6 +127,7 @@ import { insforge } from '../insforgeClient.js'
 
 export default {
   name: 'ClienteDashboard',
+  emits: ['switch-view'],
   data() {
     return {
       userName: 'Cliente',
@@ -180,7 +181,7 @@ export default {
           rating: 4.5,
           reviews: 78,
           category: 'Electrónica',
-          image: 'https://images.unsplash.com/photo-1618384887929-16ec33c8cf3b?w=400&h=300&fit=crop&crop=center'
+          image: 'https://redragon.es/content/uploads/2021/09/mitra-mobile.jpg?w=400&h=300&fit=crop&crop=center'
         },
         {
           id: 5,
@@ -230,7 +231,7 @@ export default {
           rating: 4.7,
           reviews: 189,
           category: 'Electrónica',
-          image: 'https://images.unsplash.com/photo-1593305841991-05b297ba1ae5?w=400&h=300&fit=crop&crop=center'
+          image: 'https://buketomnisportpweb.s3.us-east-2.amazonaws.com/seo/aVCItGWvbVIesYcLiC8vMxubSenztu088CrRpnpX.png'
         },
         {
           id: 10,
@@ -240,7 +241,7 @@ export default {
           rating: 4.1,
           reviews: 56,
           category: 'Hogar',
-          image: 'https://images.unsplash.com/photo-1585664811087-47a1e2b450b7?w=400&h=300&fit=crop&crop=center'
+          image: 'https://queensense.com.mx/cdn/shop/files/SAA002-01_Mesadetrabajo1_1200x1200.jpg?v=1748648750&w=400&h=300&fit=crop&crop=center'
         }
       ]
     }
@@ -260,6 +261,10 @@ export default {
     this.loadUserProfile()
   },
   methods: {
+    goToOrders() {
+      console.log('Navegando a pedidos desde Cliente.vue')
+      this.$emit('switch-view', 'pedidos')
+    },
     async loadUserProfile() {
       try {
         const { data, error } = await insforge.auth.getUser()
@@ -321,7 +326,7 @@ export default {
 }
 </script>
 
-<style scoped>
+<style>
 /* cliente-dashboard.css */
 :root {
   --white: #ffffff;
@@ -342,7 +347,6 @@ export default {
   --radius-lg: 22px;
 }
 
-* { margin: 0; padding: 0; box-sizing: border-box; }
 
 .app-container {
   font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -369,6 +373,7 @@ header h1 {
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
+  margin-left: 40px;
 }
 
 header h1 span {
@@ -383,6 +388,7 @@ header img {
   height: 40px;
   border-radius: 12px;
   object-fit: cover;
+  position: absolute;
 }
 
 .navbar ul {
@@ -416,6 +422,7 @@ header img {
   padding: 2rem 5vw;
   max-width: 1400px;
   margin: 0 auto;
+  position:  static;
 }
 
 /* Perfil del cliente */
@@ -429,7 +436,7 @@ header img {
   justify-content: space-between;
   align-items: center;
   flex-wrap: wrap;
-  position: absolute;
+
 }
 
 .profile-info h2 {

@@ -109,10 +109,10 @@ const goToLogin = () => {
 
 <template>
   <div class="register-page">
-    <header>
+    <header class="register-header">
       <div class="brand">
         <h1><span>U</span>nify</h1>
-        <img src="/img/logo-unify.png" alt="Unify logo" />
+        <img src="/img/logo-unify.png" alt="Unify logo" class="register-logo" />
       </div>
       <nav class="navbar" aria-label="Navegación principal">
         <ul class="list">
@@ -124,7 +124,7 @@ const goToLogin = () => {
       </nav>
     </header>
 
-    <main>
+    <main class="register-main">
       <article class="login-card">
         <form @submit.prevent="handleSubmit" class="login-form" aria-label="Formulario de registro">
           <h2>Crear cuenta</h2>
@@ -240,23 +240,17 @@ const goToLogin = () => {
       </article>
     </main>
 
-    <footer class="footer">
+    <footer class="register-footer">
       <p>&copy; 2026 Unify. Todos los derechos reservados.</p>
     </footer>
   </div>
 </template>
 
 
-<style>
-/* Reset y estilos base */
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
-}
+<style scoped>
+/* Register page — scoped: los estilos solo afectan este componente */
 
-body {
-  
+.register-page {
   font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
   background: linear-gradient(135deg, var(--bg-start) 0%, var(--bg-end) 100%);
   min-height: 100vh;
@@ -264,17 +258,8 @@ body {
   flex-direction: column;
 }
 
-/* Header Styles */
-img {
-  width: 40px;
-  height: 40px;
-  position: absolute;
-  top: 1rem;
-  left: 1rem;
-  border-radius: 25px;
-}
-
-header {
+/* Header */
+.register-header {
   background: rgba(255, 255, 255, 0.95);
   backdrop-filter: blur(10px);
   padding: 1rem 2rem;
@@ -284,17 +269,25 @@ header {
   box-shadow: 0 2px 20px rgba(0, 0, 0, 0.1);
 }
 
-header h1 {
+.register-logo {
+  width: 40px;
+  height: 40px;
+  border-radius: 25px;
+  position: fixed;
+  top: 2rem;
+  left: 2rem;
+}
+
+.register-header h1 {
   font-size: 2rem;
   font-weight: 700;
-  margin-left: 25px;
   background: linear-gradient(135deg, var(--bg-start) 0%, var(--brand-mid) 100%);
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
 }
 
-header h1 span {
+.register-header h1 span {
   background: linear-gradient(135deg, var(--brand-1) 0%, var(--brand-2) 100%);
   -webkit-background-clip: text;
   background-clip: text;
@@ -303,18 +296,9 @@ header h1 span {
 
 /* Navigation */
 .navbar {
-    /* position: fixed; */
-    top: 0;
-    left: 0;
-    right: 0;
-    z-index: 200;
-    height: 68px;
-    background: rgba(255, 255, 255, 0.95);
-    backdrop-filter: blur(10px);
-    border-bottom: 1px solid var(--border);
-    box-shadow: 0 2px 20px rgba(0, 0, 0, 0.1);
     display: flex;
     align-items: center;
+    height: 68px;
 }
 .navbar .list {
   display: flex;
@@ -350,7 +334,7 @@ header h1 span {
 }
 
 /* Main */
-main {
+.register-main {
   flex: 1;
   display: flex;
   justify-content: center;
@@ -569,7 +553,7 @@ main {
 }
 
 /* Footer */
-footer {
+.register-footer {
   text-align: center;
   padding: 1.5rem;
   background: rgba(255, 255, 255, 0.9);
@@ -579,7 +563,7 @@ footer {
 
 /* Responsive */
 @media (max-width: 768px) {
-  header {
+  .register-header {
     flex-direction: column;
     gap: 1rem;
     padding: 1rem;

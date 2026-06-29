@@ -182,7 +182,7 @@ const syncPendingRole = async () => {
 
 <template>
     <div class="login-page">
-    <header>
+    <header class="login-header">
       <div class="brand"> <!-- ← NUEVO: contenedor para logo y título -->
         <img src="/img/logo-unify.png" alt="Logo de Unify" />
         <h1><span>U</span>nify</h1>
@@ -285,7 +285,7 @@ const syncPendingRole = async () => {
       </article>
     </main>
 
-    <footer>
+    <footer class="login-footer">
       <p>&copy; 2026 Unify. Todos los derechos reservados.</p>
     </footer>
   </div>
@@ -304,11 +304,10 @@ const syncPendingRole = async () => {
   flex-direction: column;
   font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
   background: linear-gradient(135deg, #005e59 0%, #00b0a8 100%);
-  padding: auto;
 }
 
-/* HEADER - CORREGIDO */
-header {
+/* HEADER */
+.login-header {
   background: rgba(255, 255, 255, 0.95);
   backdrop-filter: blur(10px);
   padding: 1rem 2rem;
@@ -330,8 +329,8 @@ header {
 }
 
 .brand img {
-  width: 20px;
-  height: 20px;
+  width: 40px;
+  height: 40px;
   border-radius: 25px;
   display: block;
   position: relative;
@@ -346,6 +345,7 @@ header {
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
+  margin-left: -1rem;
 }
 
 .brand h1 span {
@@ -635,7 +635,7 @@ main {
   color: #0b3c6d;
 }
 
-footer {
+.login-footer {
   text-align: center;
   padding: 1.5rem;
   background: rgba(255, 255, 255, 0.9);
@@ -644,7 +644,7 @@ footer {
 }
 
 @media (max-width: 768px) {
-  header {
+  .login-header {
     flex-direction: column;
     gap: 1rem;
     padding: 1rem;
