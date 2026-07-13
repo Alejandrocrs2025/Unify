@@ -25,11 +25,6 @@
           <h2>Cliente</h2>
           <p>Compra productos, revisa tus pedidos y recibe entregas rápidas.</p>
         </div>
-
-        <div class="card" @click="selectRole('Delivery')">
-          <h2>Delivery</h2>
-          <p>Administra entregas y ubicación en tiempo real.</p>
-        </div>
       </div>
     </main>
 
@@ -43,15 +38,23 @@
 import { insforge } from '../insforgeClient.js'
 const emit = defineEmits(['switch-view'])
 
+const normalizeRole = (value) => {
+  const raw = String(value ?? '').trim().toLowerCase()
+  if (raw === 'empresa') return 'Empresa'
+  if (raw === 'cliente') return 'Cliente'
+  return 'Cliente'
+}
+
 const selectRole = async (role) => {
   console.log(`Rol seleccionado: ${role}`)
+  const normalizedRole = normalizeRole(role)
 
   // Intentar persistir en InsForge (tabla `profiles`).
   let userId = null
 
   try {
     // Preferir la sesión activa
-    const userRes = await insforge.auth.getUser()
+    const userRes = await insforge.auth.getCurrentUser()
     userId = userRes?.data?.user?.id
   } catch (e) {
     console.warn('Error obteniendo sesión:', e)
@@ -68,25 +71,39 @@ const selectRole = async (role) => {
 
   if (userId) {
     try {
-      await insforge.from('profiles').upsert({ id: userId, role })
+      await insforge.database.from('profiles').upsert({
+        id: userId,
+        role: normalizedRole,
+        user_type: normalizedRole,
+      })
       // limpiar pendingUserId si existía
       try { localStorage.removeItem('pendingUserId') } catch (e) {}
-      // también guardar rol localmente para UX instantánea
-      localStorage.setItem('userRole', role)
+      // también guardar rol localmente para UX instantánea, atado al userId
+      localStorage.setItem('userRole', normalizedRole)
+      localStorage.setItem('userRoleFor', userId)
       console.log('Rol persistido en InsForge para userId:', userId)
-      try { window.alert('Rol guardado correctamente.') } catch (e) {}
     } catch (err) {
       console.warn('Error guardando rol en InsForge', err)
-      try { localStorage.setItem('userRole', role) } catch (e) {}
+      try {
+        localStorage.setItem('userRole', normalizedRole)
+        localStorage.setItem('userRoleFor', userId)
+      } catch (e) {}
       try { window.alert('No se pudo guardar el rol en el servidor. Se guardó localmente.') } catch (e) {}
     }
   } else {
-    try { localStorage.setItem('userRole', role) } catch (e) {}
+    try { localStorage.setItem('userRole', normalizedRole) } catch (e) {}
     console.warn('No se encontró userId, el rol se guardó localmente y se sincronizará al iniciar sesión')
   }
 
-  if (role === 'Cliente') {
+  if (normalizedRole === 'Cliente') {
     emit('switch-view', 'cliente')
+    return
+  }
+
+  if (normalizedRole === 'Empresa') {
+    // En vez de ir directo a la vista de empresa, primero pedimos los datos
+    // del negocio (RUT, rubro, teléfono, etc.)
+    emit('switch-view', 'empresa-details')
     return
   }
 

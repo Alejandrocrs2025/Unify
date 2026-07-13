@@ -24,6 +24,23 @@ const getSignedUser = (data) => {
   return data?.user || data?.session?.user || data?.session || null
 }
 
+const getAuthErrorMessage = (error, fallback = 'No se pudo completar el inicio de sesión.') => {
+  const raw = error?.message || error?.error || error?.statusText || ''
+  const message = String(raw).toLowerCase()
+
+  if (!raw) return fallback
+  if (message.includes('invalid') || message.includes('incorrect') || message.includes('credentials')) {
+    return 'Correo o contraseña incorrectos. Intenta de nuevo.'
+  }
+  if (message.includes('forbidden') || message.includes('verify')) {
+    return 'Tu cuenta no pudo validarse. Revisa el estado de la cuenta o inténtalo nuevamente.'
+  }
+  if (message.includes('network') || message.includes('fetch')) {
+    return 'No se pudo conectar con el servidor. Revisa tu conexión e inténtalo de nuevo.'
+  }
+  return raw
+}
+
 const handleSubmit = async () => {
   showMessage('', '')
 
@@ -40,7 +57,7 @@ const handleSubmit = async () => {
     })
 
     if (error) {
-      showMessage(error.message || 'Error de inicio de sesión.', 'error')
+      showMessage(getAuthErrorMessage(error, 'Error de inicio de sesión.'), 'error')
       return
     }
 
@@ -59,7 +76,7 @@ const handleSubmit = async () => {
     emit('switch-view', nextView)
   } catch (err) {
     console.error('Login error:', err)
-    showMessage(err?.message || 'Error inesperado durante el inicio de sesión.', 'error')
+    showMessage(getAuthErrorMessage(err, 'Error inesperado durante el inicio de sesión.'), 'error')
   } finally {
     loading.value = false
   }
@@ -74,7 +91,7 @@ const handleOAuth = async (provider) => {
     const { data, error } = await insforge.auth.signInWithOAuth(provider, { redirectTo })
 
     if (error) {
-      showMessage(error.message || `Error al iniciar sesión con ${provider}.`, 'error')
+      showMessage(getAuthErrorMessage(error, `No se pudo iniciar sesión con ${provider}.`), 'error')
       return
     }
 
@@ -85,7 +102,7 @@ const handleOAuth = async (provider) => {
 
     showMessage(`No se recibió URL de redirección para ${provider}. Revisa la configuración de OAuth.`, 'error')
   } catch (err) {
-    showMessage(err?.message || `Error inesperado con ${provider}.`, 'error')
+    showMessage(getAuthErrorMessage(err, `Error inesperado con ${provider}.`), 'error')
   } finally {
     oauthLoading.value = ''
   }
@@ -100,8 +117,16 @@ const goToRegister = () => {
 }
 
 onMounted(async () => {
+  const params = new URLSearchParams(window.location.search)
+  const oauthError = params.get('error')
+  const oauthErrorDescription = params.get('error_description')
+
+  if (oauthError) {
+    showMessage(oauthErrorDescription || 'No se pudo completar el inicio de sesión con el proveedor.', 'error')
+  }
+
   try {
-    const { data, error } = await insforge.auth.getUser()
+    const { data, error } = await insforge.auth.getCurrentUser()
     if (!error && data?.user) {
       await syncPendingRole()
       const nextView = await routeAfterLogin()
@@ -112,26 +137,39 @@ onMounted(async () => {
   }
 })
 
+const normalizeUserRole = (value) => {
+  const raw = String(value ?? '').trim().toLowerCase()
+  if (raw === 'empresa') return 'Empresa'
+  if (raw === 'cliente') return 'Cliente'
+  if (raw === 'delivery') return 'Delivery'
+  return value
+}
+
 const getUserRole = async () => {
-  let role = null
-
   try {
-    role = localStorage.getItem('userRole')
-  } catch (e) {
-    console.warn('No se pudo leer userRole desde localStorage', e)
-  }
-
-  if (role) return role
-
-  try {
-    const res = await insforge.auth.getUser()
+    const res = await insforge.auth.getCurrentUser()
     const userId = res?.data?.user?.id
     if (!userId) return null
 
-    const profileRes = await insforge.from('profiles').select('role').eq('id', userId).single()
-    if (!profileRes.error && profileRes.data?.role) {
-      const normalizedRole = String(profileRes.data.role).trim()
-      try { localStorage.setItem('userRole', normalizedRole) } catch (e) {}
+    // El cache solo es válido si pertenece a ESTE usuario.
+    // Antes se leía 'userRole' sin verificar el dueño, por lo que un usuario
+    // podía heredar el rol cacheado de una sesión anterior en el mismo navegador.
+    try {
+      const cachedUserId = localStorage.getItem('userRoleFor')
+      const cachedRole = localStorage.getItem('userRole')
+      if (cachedUserId === userId && cachedRole) return cachedRole
+    } catch (e) {
+      console.warn('No se pudo leer el cache de rol', e)
+    }
+
+    const profileRes = await insforge.database.from('profiles').select('role,user_type').eq('id', userId).single()
+    const profileRole = profileRes.data?.role || profileRes.data?.user_type
+    if (!profileRes.error && profileRole) {
+      const normalizedRole = normalizeUserRole(profileRole)
+      try {
+        localStorage.setItem('userRole', normalizedRole)
+        localStorage.setItem('userRoleFor', userId)
+      } catch (e) {}
       return normalizedRole
     }
   } catch (err) {
@@ -144,7 +182,8 @@ const getUserRole = async () => {
 const routeAfterLogin = async () => {
   const role = (await getUserRole())?.toString()?.trim()?.toLowerCase()
   if (role === 'cliente') return 'cliente'
-  if (role === 'empresa' || role === 'delivery') return 'home'
+  if (role === 'empresa') return 'empresa'
+  if (role === 'delivery') return 'home'
   return 'cliente'
 }
 
@@ -160,17 +199,21 @@ const syncPendingRole = async () => {
   if (!role) return
 
   try {
-    const res = await insforge.auth.getUser()
+    const res = await insforge.auth.getCurrentUser()
     const userId = res?.data?.user?.id
     if (!userId) {
       console.warn('No hay sesión activa para sincronizar rol')
       return
     }
 
-    await insforge.from('profiles').upsert({ id: userId, role })
-    // limpiar items locales
+    const normalizedRole = normalizeUserRole(role)
+    await insforge.database.from('profiles').upsert({ id: userId, role: normalizedRole, user_type: normalizedRole })
+    // limpiar pendingUserId y re-cachear el rol ya atado a este userId
     try { localStorage.removeItem('pendingUserId') } catch (e) {}
-    try { localStorage.removeItem('userRole') } catch (e) {}
+    try {
+      localStorage.setItem('userRole', normalizedRole)
+      localStorage.setItem('userRoleFor', userId)
+    } catch (e) {}
     console.log('Rol sincronizado correctamente en InsForge')
     showMessage('Rol sincronizado correctamente.', 'success')
   } catch (err) {
@@ -228,6 +271,7 @@ const syncPendingRole = async () => {
 
           <div class="oauth-divider">o inicia con tu correo</div>
 
+          <p class="info-banner">Puedes entrar con tu correo o con Google y GitHub.</p>
           <p v-if="message" :class="['form-message', messageType]">{{ message }}</p>
 
           <div class="form-group">
@@ -490,6 +534,16 @@ main {
   color: #718096;
   margin: 1rem 0;
   font-size: 0.9rem;
+}
+
+.info-banner {
+  margin: 0 0 0.75rem;
+  padding: 0.7rem 0.9rem;
+  border-radius: 10px;
+  background: rgba(0, 94, 89, 0.08);
+  color: #005e59;
+  font-size: 0.95rem;
+  text-align: center;
 }
 
 .form-message {
