@@ -194,6 +194,16 @@
               <p><strong>Total:</strong> ${{ trackingOrder.total.toFixed(2) }}</p>
               <p><strong>Estado:</strong> <span :class="getStatusClass(trackingOrder.status)">{{ trackingOrder.status }}</span></p>
               <p><strong>Repartidor:</strong> {{ trackingDriver ? trackingDriver.name : 'Asignando...' }}</p>
+
+              <div class="driver-share-link">
+                <p class="share-link-label">Link para que el repartidor comparta su ubicación:</p>
+                <div class="share-link-row">
+                  <input type="text" readonly :value="trackingLink" @click="$event.target.select()" />
+                  <button class="btn btn-outline btn-sm" @click="copyTrackingLink">
+                    <i class="fas fa-copy"></i> Copiar
+                  </button>
+                </div>
+              </div>
             </div>
 
             <!-- Chat con el repartidor -->
@@ -242,30 +252,10 @@
                 <span class="panel-badge">Actualizado hace {{ mapUpdateSeconds }}s</span>
               </div>
               <div class="map-container">
-                <svg viewBox="0 0 600 300" xmlns="http://www.w3.org/2000/svg" class="map-svg-large">
-                  <rect width="600" height="300" fill="#e8f4f0" rx="12"/>
-                  <!-- Calles -->
-                  <line x1="0" y1="150" x2="600" y2="150" stroke="#c5ddd8" stroke-width="10"/>
-                  <line x1="300" y1="0" x2="300" y2="300" stroke="#c5ddd8" stroke-width="10"/>
-                  <line x1="0" y1="75" x2="600" y2="75" stroke="#d3e8e4" stroke-width="6"/>
-                  <line x1="0" y1="225" x2="600" y2="225" stroke="#d3e8e4" stroke-width="6"/>
-                  <!-- Ruta activa (simulada) -->
-                  <polyline points="80,250 200,190 300,170 420,130 530,110"
-                    fill="none" stroke="#00b0a8" stroke-width="4" stroke-dasharray="8,4" opacity="0.8"/>
-                  <!-- Destino (pedido) -->
-                  <circle cx="530" cy="110" r="12" fill="#005e59" opacity="0.9"/>
-                  <text x="530" y="115" text-anchor="middle" fill="white" font-size="10">📦</text>
-                  <!-- Repartidor (ubicación simulada) -->
-                  <g :transform="`translate(${driverPosition.x}, ${driverPosition.y})`">
-                    <circle r="16" fill="#00b0a8" opacity="0.95"/>
-                    <text y="5" text-anchor="middle" font-size="12">🚚</text>
-                  </g>
-                  <!-- Almacén -->
-                  <rect x="60" y="230" width="40" height="30" fill="#005e59" rx="4" opacity="0.85"/>
-                  <text x="80" y="249" text-anchor="middle" fill="white" font-size="10">🏭</text>
-                  <!-- Leyenda -->
-                  <text x="300" y="285" text-anchor="middle" fill="#5a8a86" font-size="11" font-family="Segoe UI">Mapa de seguimiento — Unify</text>
-                </svg>
+                <div ref="mapEl" class="leaflet-map-real"></div>
+                <p v-if="!driverHasRealLocation" class="map-waiting-hint">
+                  Esperando a que el repartidor comparta su ubicación en vivo…
+                </p>
               </div>
             </div>
           </div>
@@ -344,7 +334,48 @@
               <button class="btn-add" @click="addToCart(selectedProduct); closeProductDetail()">
                 <i class="fas fa-shopping-cart"></i> Agregar al carrito
               </button>
+              <button class="btn-outline" style="margin-top: 0.5rem; width: 100%;" @click="openCompanyChat(selectedProduct)">
+                <i class="fas fa-comment-dots"></i> Chatear con {{ selectedProduct.seller || 'la empresa' }}
+              </button>
             </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ════════════════════════════════════════
+           MODAL: CHAT CON LA EMPRESA
+      ════════════════════════════════════════ -->
+      <div class="modal-overlay" v-if="companyChat.open" @click.self="closeCompanyChat">
+        <div class="modal-content company-chat-modal">
+          <button class="modal-close" @click="closeCompanyChat">&times;</button>
+          <div class="mini-chat-header">
+            <h4><i class="fas fa-comments"></i> Chat con {{ companyChat.companyName }}</h4>
+          </div>
+          <div class="chat-messages-box" ref="companyChatBox">
+            <p v-if="companyChat.messages.length === 0" style="text-align:center; color:#8aa5a1; padding: 1rem;">
+              Aún no hay mensajes. ¡Escribe el primero!
+            </p>
+            <div
+              v-for="msg in companyChat.messages"
+              :key="msg.id"
+              class="chat-bubble"
+              :class="msg.sender_role === 'cliente' ? 'bubble-empresa' : 'bubble-driver'"
+            >
+              <div class="bubble-text">{{ msg.text }}</div>
+              <div class="bubble-time">{{ new Date(msg.created_at).toLocaleTimeString('es', { hour: '2-digit', minute: '2-digit' }) }}</div>
+            </div>
+          </div>
+          <div class="chat-input">
+            <input
+              v-model="companyChat.input"
+              type="text"
+              placeholder="Escribe un mensaje..."
+              @keyup.enter="sendCompanyChatMessage"
+              :disabled="companyChat.loading"
+            />
+            <button class="btn btn-primary" @click="sendCompanyChatMessage" :disabled="!companyChat.input.trim() || companyChat.loading">
+              <i class="fas fa-paper-plane"></i> Enviar
+            </button>
           </div>
         </div>
       </div>
@@ -398,6 +429,8 @@
 
 <script>
 import { insforge } from '../insforgeClient.js'
+import L from 'leaflet'
+import 'leaflet/dist/leaflet.css'
 
 export default {
   name: 'ClienteDashboard',
@@ -409,6 +442,7 @@ export default {
       userEmail: 'cliente@email.com',
       userRole: 'Cliente',
       userPoints: 1280,
+      currentUserId: null,
 
       // ─── Vistas ──────────────────────────────
       currentView: 'home', // home | products | orders | tracking | profile
@@ -472,8 +506,21 @@ export default {
       driverTyping: false,
       chatMessages: {}, // key: orderId, value: array de mensajes
       mapUpdateSeconds: 0,
-      driverPosition: { x: 200, y: 170 },
-      moveInterval: null,
+      driverRealPosition: null, // { lat, lng } — viene de InsForge Realtime
+      leafletMap: null,
+      driverMarker: null,
+      realtimeChannel: null,
+
+      // ─── Chat real con la empresa (InsForge) ─
+      companyChat: {
+        open: false,
+        companyId: null,
+        companyName: '',
+        messages: [],
+        input: '',
+        loading: false,
+      },
+      companyChatPollInterval: null,
     }
   },
 
@@ -527,33 +574,43 @@ export default {
     currentChatMessages() {
       if (!this.trackingOrderId) return []
       return this.chatMessages[this.trackingOrderId] || []
+    },
+    trackingToken() {
+      // El id del pedido puede traer '#', que rompe una URL (se interpreta como fragmento)
+      return this.trackingOrderId ? this.trackingOrderId.replace('#', '') : ''
+    },
+    trackingLink() {
+      if (!this.trackingToken) return ''
+      return `${window.location.origin}/repartidor/${encodeURIComponent(this.trackingToken)}`
+    },
+    driverHasRealLocation() {
+      return !!this.driverRealPosition
     }
   },
 
   mounted() {
     this.loadUserProfile()
     this.loadProducts()
-    // Movimiento del repartidor cada 2 segundos
-    this.moveInterval = setInterval(() => {
-      this.simulateDriverMovement()
-    }, 2000)
-    // Actualizar contador del mapa cada segundo
+    // Actualizar contador del mapa cada segundo (segundos desde la última ubicación real)
     setInterval(() => {
-      this.mapUpdateSeconds = (this.mapUpdateSeconds % 60) + 1
+      this.mapUpdateSeconds = (this.mapUpdateSeconds % 999) + 1
     }, 1000)
     // Inicializar chats para pedidos con conductor
     this.initChatsForOrders()
+    // Conectar a InsForge Realtime para recibir la ubicación del repartidor
+    this.connectRealtime()
   },
 
   beforeUnmount() {
-    if (this.moveInterval) clearInterval(this.moveInterval)
+    this.disconnectRealtime()
+    if (this.companyChatPollInterval) clearInterval(this.companyChatPollInterval)
   },
 
   methods: {
     // ─── Perfil ────────────────────────────────
     async loadUserProfile() {
       try {
-        const { data, error } = await insforge.auth.getUser()
+        const { data, error } = await insforge.auth.getCurrentUser()
         if (error) {
           console.warn('No se pudo obtener el usuario actual', error)
           return
@@ -563,21 +620,100 @@ export default {
 
         this.userName = user.user_metadata?.full_name || user.name || user.email || 'Cliente'
         this.userEmail = user.email || 'cliente@email.com'
-
-        const profileRes = await insforge.from('profiles').select('role,user_type').eq('id', user.id).single()
-        const profileRole = profileRes?.data?.role || profileRes?.data?.user_type
-        if (!profileRes?.error && profileRole) {
-          this.userRole = profileRole
-        }
+        this.currentUserId = user.id || null
       } catch (err) {
         console.warn('Error cargando perfil de cliente:', err)
+      }
+    },
+
+    // ─── Chat real con la empresa (InsForge) ─────
+    openCompanyChat(product) {
+      if (!product?.sellerId) {
+        alert('No se pudo identificar a la empresa vendedora de este producto.')
+        return
+      }
+      if (!this.currentUserId) {
+        alert('Inicia sesión de nuevo para poder chatear con la empresa.')
+        return
+      }
+      this.companyChat.companyId = product.sellerId
+      this.companyChat.companyName = product.seller || 'Empresa'
+      this.companyChat.messages = []
+      this.companyChat.input = ''
+      this.companyChat.open = true
+
+      this.loadCompanyChatMessages()
+      if (this.companyChatPollInterval) clearInterval(this.companyChatPollInterval)
+      this.companyChatPollInterval = setInterval(() => {
+        this.loadCompanyChatMessages()
+      }, 4000)
+    },
+
+    closeCompanyChat() {
+      this.companyChat.open = false
+      if (this.companyChatPollInterval) {
+        clearInterval(this.companyChatPollInterval)
+        this.companyChatPollInterval = null
+      }
+    },
+
+    async loadCompanyChatMessages() {
+      if (!this.companyChat.companyId || !this.currentUserId) return
+      try {
+        const { data, error } = await insforge.database
+          .from('messages')
+          .select('*')
+          .eq('client_id', this.currentUserId)
+          .eq('company_id', this.companyChat.companyId)
+          .order('created_at', { ascending: true })
+
+        if (error) {
+          console.warn('No se pudieron cargar los mensajes:', error)
+          return
+        }
+        this.companyChat.messages = data || []
+        this.$nextTick(() => {
+          const box = this.$refs.companyChatBox
+          if (box) box.scrollTop = box.scrollHeight
+        })
+      } catch (err) {
+        console.warn('Error inesperado cargando mensajes:', err)
+      }
+    },
+
+    async sendCompanyChatMessage() {
+      const text = this.companyChat.input.trim()
+      if (!text || !this.companyChat.companyId || !this.currentUserId) return
+
+      this.companyChat.input = ''
+      this.companyChat.loading = true
+      try {
+        const { error } = await insforge.database.from('messages').insert({
+          client_id: this.currentUserId,
+          client_name: this.userName,
+          company_id: this.companyChat.companyId,
+          company_name: this.companyChat.companyName,
+          sender_id: this.currentUserId,
+          sender_role: 'cliente',
+          text,
+        })
+        if (error) {
+          alert('No se pudo enviar el mensaje: ' + (error.message || 'error desconocido'))
+          return
+        }
+        await this.loadCompanyChatMessages()
+      } catch (err) {
+        console.warn('Error inesperado enviando mensaje:', err)
+        alert('Error inesperado enviando el mensaje.')
+      } finally {
+        this.companyChat.loading = false
       }
     },
 
     // ─── Productos (InsForge) ──────────────────
     async loadProducts() {
       try {
-        const { data, error } = await insforge
+        const { data, error } = await insforge.database
           .from('products')
           .select('*')
           .eq('status', 'Activo')
@@ -594,6 +730,7 @@ export default {
           price: p.price,
           category: p.category,
           seller: p.seller_name || 'Unify',
+          sellerId: p.seller_id || null,
           rating: p.rating,
           reviews: p.reviews,
           image: p.image,
@@ -679,6 +816,8 @@ export default {
       console.log('Iniciando tracking para', orderId)
       this.trackingOrderId = orderId
       this.currentView = 'tracking'
+      this.driverRealPosition = null
+      this.mapUpdateSeconds = 0
 
       const order = this.orders.find(o => o.id === orderId)
       if (!order) {
@@ -698,8 +837,98 @@ export default {
         this.initChatForOrder(orderId, order.driverName)
       }
 
-      // Resetear posición del driver
-      this.driverPosition = { x: 200, y: 170 }
+      // Suscribirse al canal de este pedido para recibir su ubicación en vivo
+      this.subscribeToOrderChannel(this.trackingToken)
+
+      this.$nextTick(() => {
+        this.initLeafletMap()
+      })
+    },
+
+    // ─── Realtime (InsForge) — ubicación del repartidor ──
+    async connectRealtime() {
+      try {
+        await insforge.realtime.connect()
+        insforge.realtime.on('location_update', (data) => {
+          if (data && typeof data.lat === 'number' && typeof data.lng === 'number') {
+            this.driverRealPosition = { lat: data.lat, lng: data.lng }
+            this.mapUpdateSeconds = 0
+            this.updateDriverMarker()
+          }
+        })
+      } catch (err) {
+        console.warn('No se pudo conectar a InsForge Realtime:', err)
+      }
+    },
+    async subscribeToOrderChannel(token) {
+      if (!token) return
+      try {
+        await insforge.realtime.subscribe(`order:${token}`)
+      } catch (err) {
+        console.warn('No se pudo suscribir al canal de seguimiento:', err)
+      }
+    },
+    disconnectRealtime() {
+      try {
+        if (this.trackingToken) {
+          insforge.realtime.unsubscribe(`order:${this.trackingToken}`)
+        }
+      } catch (e) {
+        // no-op: puede que el SDK no tenga unsubscribe o ya esté desconectado
+      }
+    },
+    copyTrackingLink() {
+      if (!this.trackingLink) return
+      navigator.clipboard
+        .writeText(this.trackingLink)
+        .then(() => alert('✅ Link copiado. Ábrelo en el celular del repartidor.'))
+        .catch(() => alert('No se pudo copiar automáticamente. Selecciona el texto y cópialo a mano.'))
+    },
+
+    // ─── Mapa real (Leaflet) ──────────────────────
+    initLeafletMap() {
+      if (this.leafletMap) {
+        this.leafletMap.remove()
+        this.leafletMap = null
+        this.driverMarker = null
+      }
+
+      const mapEl = this.$refs.mapEl
+      if (!mapEl) return
+
+      const defaultCenter = [13.6929, -89.2182] // San Salvador, El Salvador
+      this.leafletMap = L.map(mapEl).setView(defaultCenter, 13)
+
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+        maxZoom: 19,
+      }).addTo(this.leafletMap)
+
+      if (this.driverRealPosition) {
+        this.updateDriverMarker()
+      }
+
+      this.$nextTick(() => {
+        if (this.leafletMap) this.leafletMap.invalidateSize()
+      })
+    },
+    updateDriverMarker() {
+      if (!this.leafletMap || !this.driverRealPosition) return
+      const { lat, lng } = this.driverRealPosition
+
+      if (!this.driverMarker) {
+        const truckIcon = L.divIcon({
+          html: '<div style="font-size: 26px; line-height: 1;">🚚</div>',
+          className: 'driver-marker-icon',
+          iconSize: [30, 30],
+          iconAnchor: [15, 15],
+        })
+        this.driverMarker = L.marker([lat, lng], { icon: truckIcon }).addTo(this.leafletMap)
+      } else {
+        this.driverMarker.setLatLng([lat, lng])
+      }
+
+      this.leafletMap.panTo([lat, lng])
     },
 
     initChatsForOrders() {
@@ -781,16 +1010,6 @@ export default {
         const box = this.$refs.chatBoxMessages
         if (box) box.scrollTop = box.scrollHeight
       })
-    },
-
-    simulateDriverMovement() {
-      const currentX = this.driverPosition.x
-      const currentY = this.driverPosition.y
-      const deltaX = (Math.random() - 0.5) * 40
-      const deltaY = (Math.random() - 0.5) * 40
-      let newX = Math.min(560, Math.max(40, currentX + deltaX))
-      let newY = Math.min(260, Math.max(40, currentY + deltaY))
-      this.driverPosition = { x: newX, y: newY }
     },
 
     // ─── Imágenes ──────────────────────────────
@@ -1320,6 +1539,16 @@ header img {
   position: relative;
   box-shadow: 0 20px 60px rgba(0,0,0,0.3);
 }
+.company-chat-modal {
+  max-width: 480px;
+  display: flex;
+  flex-direction: column;
+  max-height: 70vh;
+}
+.company-chat-modal .chat-messages-box {
+  flex: 1;
+  min-height: 300px;
+}
 .modal-close {
   position: absolute;
   top: 1rem;
@@ -1446,6 +1675,30 @@ header img {
   margin-top: 0;
   color: var(--text-dark);
 }
+.driver-share-link {
+  margin-top: 0.9rem;
+  padding-top: 0.9rem;
+  border-top: 1px dashed var(--border);
+}
+.share-link-label {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  margin-bottom: 0.4rem;
+}
+.share-link-row {
+  display: flex;
+  gap: 0.4rem;
+}
+.share-link-row input {
+  flex: 1;
+  min-width: 0;
+  padding: 0.5rem 0.7rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  background: #f7fafc;
+}
 .tracking-map-panel .card-panel {
   height: 100%;
 }
@@ -1570,11 +1823,25 @@ header img {
   background: var(--bg-light);
   border-radius: var(--radius-lg);
   overflow: hidden;
+  position: relative;
 }
-.map-svg-large {
+.leaflet-map-real {
   width: 100%;
-  height: auto;
-  display: block;
+  height: 400px;
+}
+.map-waiting-hint {
+  position: absolute;
+  bottom: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(255, 255, 255, 0.92);
+  padding: 0.5rem 1rem;
+  border-radius: 20px;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  z-index: 400;
+  pointer-events: none;
 }
 
 /* ── Footer ──────────────────────────────────── */

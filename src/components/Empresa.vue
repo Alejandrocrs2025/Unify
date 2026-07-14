@@ -900,10 +900,28 @@
       <template v-if="currentView === 'messages'">
         <div class="page-header">
           <h2><i class="fas fa-comment-dots"></i> Mensajes y seguimiento</h2>
-          <p class="page-subtitle">Comunícate con tus repartidores y visualiza sus ubicaciones en tiempo real</p>
+          <p class="page-subtitle">Comunícate con tus repartidores y con tus clientes</p>
         </div>
 
-        <div class="messages-layout">
+        <div class="messages-tabs" style="display:flex; gap:0.5rem; margin-bottom:1rem;">
+          <button
+            class="btn"
+            :class="messagesTab === 'drivers' ? 'btn-primary' : 'btn-outline'"
+            @click="openDriversTab"
+          >
+            <i class="fas fa-truck"></i> Repartidores
+          </button>
+          <button
+            class="btn"
+            :class="messagesTab === 'clients' ? 'btn-primary' : 'btn-outline'"
+            @click="openClientsTab"
+          >
+            <i class="fas fa-user"></i> Clientes
+            <span v-if="clientConversations.length" class="panel-badge" style="margin-left:0.4rem;">{{ clientConversations.length }}</span>
+          </button>
+        </div>
+
+        <div class="messages-layout" v-if="messagesTab === 'drivers'">
           <!-- Columna izquierda: Lista de conversaciones -->
           <div class="conversations-list">
             <div class="conversations-header">
@@ -980,8 +998,74 @@
           </div>
         </div>
 
+        <!-- ─── Panel de chat real con clientes ─── -->
+        <div class="messages-layout" v-if="messagesTab === 'clients'">
+          <div class="conversations-list">
+            <div class="conversations-header">
+              <h4>Clientes</h4>
+              <span class="online-count">{{ clientConversations.length }} conversaciones</span>
+            </div>
+            <p v-if="clientConversations.length === 0" style="padding:1rem; color:#8aa5a1; text-align:center;">
+              Aún no tienes mensajes de clientes.
+            </p>
+            <div class="conversation-item"
+              v-for="conv in clientConversations"
+              :key="conv.clientId"
+              :class="{ active: selectedClientId === conv.clientId }"
+              @click="selectClientConversation(conv)"
+            >
+              <div class="conv-avatar">
+                <span>{{ conv.clientName.slice(0, 2).toUpperCase() }}</span>
+              </div>
+              <div class="conv-info">
+                <div class="conv-name">{{ conv.clientName }}</div>
+                <div class="conv-last-msg">{{ conv.lastMessage }}</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="chat-panel">
+            <div class="chat-header" v-if="selectedClientId">
+              <div class="chat-driver-info">
+                <div class="chat-driver-avatar">{{ selectedClientName.slice(0, 2).toUpperCase() }}</div>
+                <div>
+                  <div class="chat-driver-name">{{ selectedClientName }}</div>
+                </div>
+              </div>
+            </div>
+
+            <div class="chat-messages-box" ref="clientChatBox">
+              <p v-if="!selectedClientId" style="text-align:center; color:#8aa5a1; padding: 2rem;">
+                Selecciona una conversación de la izquierda.
+              </p>
+              <div
+                v-for="msg in clientChatMessages"
+                :key="msg.id"
+                class="chat-bubble"
+                :class="msg.sender_role === 'empresa' ? 'bubble-empresa' : 'bubble-driver'"
+              >
+                <div class="bubble-text">{{ msg.text }}</div>
+                <div class="bubble-time">{{ new Date(msg.created_at).toLocaleTimeString('es', { hour: '2-digit', minute: '2-digit' }) }}</div>
+              </div>
+            </div>
+
+            <div class="chat-input" v-if="selectedClientId">
+              <input
+                v-model="clientChatInput"
+                type="text"
+                placeholder="Escribe un mensaje..."
+                @keyup.enter="sendClientChatMessage"
+                :disabled="clientChatLoading"
+              />
+              <button class="btn btn-primary" @click="sendClientChatMessage" :disabled="!clientChatInput.trim() || clientChatLoading">
+                <i class="fas fa-paper-plane"></i> Enviar
+              </button>
+            </div>
+          </div>
+        </div>
+
         <!-- Mapa grande (debajo) -->
-        <div class="map-large">
+        <div class="map-large" v-if="messagesTab === 'drivers'">
           <div class="card-panel">
             <div class="panel-header">
               <h3><i class="fas fa-map"></i> Ubicación de repartidores en tiempo real</h3>
@@ -1047,6 +1131,7 @@ export default {
       // ─── Estado global ──────────────────────────
       companyName: 'Empresa Demo',
       companyEmail: 'empresa@unify.com',
+      companyId: null,
       currentView: 'dashboard',
       globalSearch: '',
       searchFocused: false,
@@ -1205,6 +1290,15 @@ export default {
       chatInputMsg: '',
       driverTyping: false,
       mapUpdateSeconds: 0,
+      messagesTab: 'drivers', // 'drivers' | 'clients'
+      clientConversations: [],
+      selectedClientId: null,
+      selectedClientName: '',
+      clientChatMessages: [],
+      clientChatInput: '',
+      clientChatLoading: false,
+      clientChatPollInterval: null,
+      conversationsPollInterval: null,
       driverChats: {
         1: [
           { from: 'driver', name: 'Carlos M.', text: 'Salí del almacén con 3 pedidos. ETA zona sur: 15 min.', time: '10:30' },
@@ -1382,6 +1476,8 @@ export default {
 
   beforeUnmount() {
     document.removeEventListener('click', this.closeProfileMenuOutside)
+    if (this.conversationsPollInterval) clearInterval(this.conversationsPollInterval)
+    if (this.clientChatPollInterval) clearInterval(this.clientChatPollInterval)
   },
 
   methods: {
@@ -1392,6 +1488,7 @@ export default {
         if (error || !data?.user) return
         const u = data.user
         this.companyEmail = u.email || 'empresa@unify.com'
+        this.companyId = u.id || null
 
         // El nombre comercial real se guarda en company_profiles (formulario de detalles de empresa),
         // no en los metadatos del usuario de auth.
@@ -1402,6 +1499,124 @@ export default {
           this.companyName = u.user_metadata?.full_name || u.email || 'Empresa Demo'
         }
       } catch (e) { console.warn('Error cargando perfil:', e) }
+    },
+
+    // ─── Chat real con clientes (InsForge) ───────
+    openClientsTab() {
+      this.messagesTab = 'clients'
+      this.loadClientConversations()
+      if (this.conversationsPollInterval) clearInterval(this.conversationsPollInterval)
+      this.conversationsPollInterval = setInterval(() => {
+        this.loadClientConversations()
+      }, 5000)
+    },
+
+    openDriversTab() {
+      this.messagesTab = 'drivers'
+      if (this.conversationsPollInterval) {
+        clearInterval(this.conversationsPollInterval)
+        this.conversationsPollInterval = null
+      }
+      if (this.clientChatPollInterval) {
+        clearInterval(this.clientChatPollInterval)
+        this.clientChatPollInterval = null
+      }
+    },
+
+    async loadClientConversations() {
+      if (!this.companyId) return
+      try {
+        const { data, error } = await insforge.database
+          .from('messages')
+          .select('*')
+          .eq('company_id', this.companyId)
+          .order('created_at', { ascending: false })
+
+        if (error) {
+          console.warn('No se pudieron cargar las conversaciones:', error)
+          return
+        }
+
+        // Agrupar por cliente y quedarnos con el último mensaje de cada uno
+        const byClient = {}
+        for (const msg of data || []) {
+          if (!byClient[msg.client_id]) {
+            byClient[msg.client_id] = {
+              clientId: msg.client_id,
+              clientName: msg.client_name || 'Cliente',
+              lastMessage: msg.text,
+              lastTime: msg.created_at,
+            }
+          }
+        }
+        this.clientConversations = Object.values(byClient)
+      } catch (err) {
+        console.warn('Error inesperado cargando conversaciones:', err)
+      }
+    },
+
+    selectClientConversation(conv) {
+      this.selectedClientId = conv.clientId
+      this.selectedClientName = conv.clientName
+      this.loadClientChatMessages()
+      if (this.clientChatPollInterval) clearInterval(this.clientChatPollInterval)
+      this.clientChatPollInterval = setInterval(() => {
+        this.loadClientChatMessages()
+      }, 4000)
+    },
+
+    async loadClientChatMessages() {
+      if (!this.selectedClientId || !this.companyId) return
+      try {
+        const { data, error } = await insforge.database
+          .from('messages')
+          .select('*')
+          .eq('client_id', this.selectedClientId)
+          .eq('company_id', this.companyId)
+          .order('created_at', { ascending: true })
+
+        if (error) {
+          console.warn('No se pudieron cargar los mensajes:', error)
+          return
+        }
+        this.clientChatMessages = data || []
+        this.$nextTick(() => {
+          const box = this.$refs.clientChatBox
+          if (box) box.scrollTop = box.scrollHeight
+        })
+      } catch (err) {
+        console.warn('Error inesperado cargando mensajes:', err)
+      }
+    },
+
+    async sendClientChatMessage() {
+      const text = this.clientChatInput.trim()
+      if (!text || !this.selectedClientId || !this.companyId) return
+
+      this.clientChatInput = ''
+      this.clientChatLoading = true
+      try {
+        const { error } = await insforge.database.from('messages').insert({
+          client_id: this.selectedClientId,
+          client_name: this.selectedClientName,
+          company_id: this.companyId,
+          company_name: this.companyName,
+          sender_id: this.companyId,
+          sender_role: 'empresa',
+          text,
+        })
+        if (error) {
+          alert('No se pudo enviar el mensaje: ' + (error.message || 'error desconocido'))
+          return
+        }
+        await this.loadClientChatMessages()
+        await this.loadClientConversations()
+      } catch (err) {
+        console.warn('Error inesperado enviando mensaje:', err)
+        alert('Error inesperado enviando el mensaje.')
+      } finally {
+        this.clientChatLoading = false
+      }
     },
     toggleProfileMenu() {
       this.profileMenuOpen = !this.profileMenuOpen
