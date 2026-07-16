@@ -14,6 +14,44 @@ const showPassword = ref(false)
 const showConfirm = ref(false)
 const message = ref('')
 const messageType = ref('')
+const oauthLoading = ref('')
+
+const showMessage = (text, type = 'info') => {
+  message.value = text
+  messageType.value = type
+}
+
+const getAuthErrorMessage = (error, fallback = 'No se pudo completar el registro.') => {
+  const raw = error?.message || error?.error || error?.statusText || ''
+  if (!raw) return fallback
+  return raw
+}
+
+const handleOAuth = async (provider) => {
+  showMessage('', '')
+  oauthLoading.value = provider
+
+  try {
+    const redirectTo = window.location.origin
+    const { data, error } = await insforge.auth.signInWithOAuth({ provider, redirectTo })
+
+    if (error) {
+      showMessage(getAuthErrorMessage(error, `No se pudo continuar con ${provider}.`), 'error')
+      return
+    }
+
+    if (data?.url) {
+      window.location.href = data.url
+      return
+    }
+
+    showMessage(`No se recibió URL de redirección para ${provider}. Revisa la configuración de OAuth.`, 'error')
+  } catch (err) {
+    showMessage(getAuthErrorMessage(err, `Error inesperado con ${provider}.`), 'error')
+  } finally {
+    oauthLoading.value = ''
+  }
+}
 
 const passwordHint = computed(() => {
   if (!password.value) return ''
@@ -128,6 +166,31 @@ const goToLogin = () => {
       <article class="login-card">
         <form @submit.prevent="handleSubmit" class="login-form" aria-label="Formulario de registro">
           <h2>Crear cuenta</h2>
+
+          <div class="oauth-buttons">
+            <button type="button" class="oauth-btn google" @click="handleOAuth('google')" :disabled="oauthLoading === 'google'">
+              <span class="icon" aria-hidden="true">
+                <svg viewBox="0 0 533.5 544.3" xmlns="http://www.w3.org/2000/svg">
+                  <path fill="#4285F4" d="M533.5 278.4c0-17.4-1.6-34.2-4.6-50.4H272.1v95.4h146.9c-6.3 33.7-25.2 62.3-53.8 81.4v67.7h86.9c50.9-46.9 80.4-115.7 80.4-193.9z" />
+                  <path fill="#34A853" d="M272.1 544.3c72.9 0 134.1-24.2 178.8-65.8l-86.9-67.7c-24.1 16.1-55 25.5-91.9 25.5-70.6 0-130.4-47.6-151.8-111.8H31.6v70.4c44.5 88.1 136.3 149.4 240.5 149.4z" />
+                  <path fill="#FBBC05" d="M120.3 325.8c-10.1-29.5-10.1-61.2 0-90.7V164.7H31.6c-38.9 77.6-38.9 169.6 0 247.2l88.7-70.4z" />
+                  <path fill="#EA4335" d="M272.1 108.4c39.6-.6 77.8 14.4 106.7 41.4l80-80C405.8 24.2 344.6 0 272.1 0 168 0 76.2 61.3 31.6 149.4l88.7 70.4C141.7 156 201.5 108.4 272.1 108.4z" />
+                </svg>
+              </span>
+              {{ oauthLoading === 'google' ? 'Redirigiendo...' : 'Registrarme con Google' }}
+            </button>
+
+            <button type="button" class="oauth-btn github" @click="handleOAuth('github')" :disabled="oauthLoading === 'github'">
+              <span class="icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                  <path fill="currentColor" d="M12 0C5.37 0 0 5.37 0 12c0 5.3 3.438 9.8 8.205 11.387.6.112.82-.262.82-.583 0-.288-.01-1.05-.015-2.06-3.338.725-4.042-1.61-4.042-1.61-.546-1.387-1.333-1.757-1.333-1.757-1.09-.745.083-.73.083-.73 1.205.085 1.84 1.237 1.84 1.237 1.07 1.835 2.805 1.305 3.49.998.108-.775.42-1.305.763-1.605-2.665-.305-5.466-1.335-5.466-5.93 0-1.31.47-2.38 1.235-3.22-.125-.304-.535-1.527.115-3.18 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.4 3-.405 1.02.005 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.655 1.653.245 2.876.12 3.18.77.84 1.235 1.91 1.235 3.22 0 4.605-2.805 5.62-5.475 5.92.43.372.81 1.102.81 2.222 0 1.605-.015 2.896-.015 3.286 0 .325.21.7.825.58C20.565 21.795 24 17.295 24 12c0-6.63-5.37-12-12-12z" />
+                </svg>
+              </span>
+              {{ oauthLoading === 'github' ? 'Redirigiendo...' : 'Registrarme con GitHub' }}
+            </button>
+          </div>
+
+          <div class="oauth-divider">o regístrate con tu correo</div>
 
           <p v-if="message" :class="['form-message', messageType]">{{ message }}</p>
 
@@ -376,6 +439,83 @@ const goToLogin = () => {
   margin-bottom: 1.5rem;
   text-align: center;
   font-weight: 600;
+}
+
+.oauth-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.oauth-btn {
+  color: white;
+  cursor: pointer;
+  border: none;
+  border-radius: 10px;
+  width: 100%;
+  padding: 0.85rem 1rem;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.oauth-btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.12);
+}
+
+.oauth-btn:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.oauth-btn.google {
+  background: #4285f4;
+}
+
+.oauth-btn.github {
+  background: #24292f;
+}
+
+.oauth-btn .icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+}
+
+.oauth-divider {
+  text-align: center;
+  color: #718096;
+  margin: 1rem 0;
+  font-size: 0.9rem;
+}
+
+.form-message {
+  margin-bottom: 1rem;
+  padding: 0.75rem 1rem;
+  border-radius: 10px;
+  font-size: 0.95rem;
+}
+
+.form-message.success {
+  background: #e6fffa;
+  color: #065f46;
+}
+
+.form-message.error {
+  background: #ffe8e8;
+  color: #9b2c2c;
+}
+
+.form-message.info {
+  background: #eff6ff;
+  color: #1e3a8a;
 }
 
 .form-group {

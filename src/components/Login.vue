@@ -1,6 +1,7 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { insforge } from '../insforgeClient.js'
+import { checkSessionAndGetView } from '../authHelpers.js'
 
 const emit = defineEmits(['switch-view'])
 const email = ref('')
@@ -71,8 +72,7 @@ const handleSubmit = async () => {
       showMessage('Inicio de sesión exitoso, pero no se pudo validar el usuario.', 'warning')
     }
 
-    await syncPendingRole()
-    const nextView = await routeAfterLogin()
+    const nextView = (await checkSessionAndGetView()) || 'main'
     emit('switch-view', nextView)
   } catch (err) {
     console.error('Login error:', err)
@@ -88,7 +88,7 @@ const handleOAuth = async (provider) => {
 
   try {
     const redirectTo = window.location.origin
-    const { data, error } = await insforge.auth.signInWithOAuth(provider, { redirectTo })
+    const { data, error } = await insforge.auth.signInWithOAuth({ provider, redirectTo })
 
     if (error) {
       showMessage(getAuthErrorMessage(error, `No se pudo iniciar sesión con ${provider}.`), 'error')
@@ -126,101 +126,12 @@ onMounted(async () => {
   }
 
   try {
-    const { data, error } = await insforge.auth.getCurrentUser()
-    if (!error && data?.user) {
-      await syncPendingRole()
-      const nextView = await routeAfterLogin()
-      emit('switch-view', nextView)
-    }
+    const nextView = await checkSessionAndGetView()
+    if (nextView) emit('switch-view', nextView)
   } catch (err) {
     console.debug('No hay usuario vigente.', err)
   }
 })
-
-const normalizeUserRole = (value) => {
-  const raw = String(value ?? '').trim().toLowerCase()
-  if (raw === 'empresa') return 'Empresa'
-  if (raw === 'cliente') return 'Cliente'
-  if (raw === 'delivery') return 'Delivery'
-  return value
-}
-
-const getUserRole = async () => {
-  try {
-    const res = await insforge.auth.getCurrentUser()
-    const userId = res?.data?.user?.id
-    if (!userId) return null
-
-    // El cache solo es válido si pertenece a ESTE usuario.
-    // Antes se leía 'userRole' sin verificar el dueño, por lo que un usuario
-    // podía heredar el rol cacheado de una sesión anterior en el mismo navegador.
-    try {
-      const cachedUserId = localStorage.getItem('userRoleFor')
-      const cachedRole = localStorage.getItem('userRole')
-      if (cachedUserId === userId && cachedRole) return cachedRole
-    } catch (e) {
-      console.warn('No se pudo leer el cache de rol', e)
-    }
-
-    const profileRes = await insforge.database.from('profiles').select('role,user_type').eq('id', userId).single()
-    const profileRole = profileRes.data?.role || profileRes.data?.user_type
-    if (!profileRes.error && profileRole) {
-      const normalizedRole = normalizeUserRole(profileRole)
-      try {
-        localStorage.setItem('userRole', normalizedRole)
-        localStorage.setItem('userRoleFor', userId)
-      } catch (e) {}
-      return normalizedRole
-    }
-  } catch (err) {
-    console.warn('No se pudo obtener el rol desde Insforge', err)
-  }
-
-  return null
-}
-
-const routeAfterLogin = async () => {
-  const role = (await getUserRole())?.toString()?.trim()?.toLowerCase()
-  if (role === 'cliente') return 'cliente'
-  if (role === 'empresa') return 'empresa'
-  if (role === 'delivery') return 'home'
-  return 'cliente'
-}
-
-// Sincroniza `userRole` y `pendingUserId` desde localStorage a la tabla `profiles`
-const syncPendingRole = async () => {
-  let role = null
-  try {
-    role = localStorage.getItem('userRole')
-  } catch (e) {
-    console.warn('No se pudo leer userRole desde localStorage', e)
-  }
-
-  if (!role) return
-
-  try {
-    const res = await insforge.auth.getCurrentUser()
-    const userId = res?.data?.user?.id
-    if (!userId) {
-      console.warn('No hay sesión activa para sincronizar rol')
-      return
-    }
-
-    const normalizedRole = normalizeUserRole(role)
-    await insforge.database.from('profiles').upsert({ id: userId, role: normalizedRole, user_type: normalizedRole })
-    // limpiar pendingUserId y re-cachear el rol ya atado a este userId
-    try { localStorage.removeItem('pendingUserId') } catch (e) {}
-    try {
-      localStorage.setItem('userRole', normalizedRole)
-      localStorage.setItem('userRoleFor', userId)
-    } catch (e) {}
-    console.log('Rol sincronizado correctamente en InsForge')
-    showMessage('Rol sincronizado correctamente.', 'success')
-  } catch (err) {
-    console.warn('Error sincronizando rol pendiente:', err)
-    showMessage('No se pudo sincronizar el rol pendiente.', 'error')
-  }
-}
 </script>
 
 <template>

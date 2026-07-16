@@ -420,7 +420,7 @@ const loadUserRole = () => {
 
 const checkSession = async () => {
   try {
-    const { data, error } = await insforge.auth.getUser()
+    const { data, error } = await insforge.auth.getCurrentUser()
     if (!error && data?.user) {
       loggedIn.value = true
       loadUserRole()

@@ -14,6 +14,10 @@
           <li @click="currentView = 'products'" :class="{ active: currentView === 'products' }">
             <i class="fas fa-box"></i> Productos
           </li>
+          <li @click="currentView = 'products'" :class="{ active: currentView === 'products' }" class="cart-nav-item">
+            <i class="fas fa-shopping-cart"></i> Carrito
+            <span v-if="cartItemCount > 0" class="cart-nav-badge">{{ cartItemCount }}</span>
+          </li>
           <li @click="currentView = 'orders'" :class="{ active: currentView === 'orders' }">
             <i class="fas fa-shopping-bag"></i> Mis Pedidos
           </li>
@@ -282,16 +286,29 @@
            CARRITO DE COMPRAS (visible siempre)
       ════════════════════════════════════════ -->
       <div class="cart-panel">
-        <h3><i class="fas fa-shopping-cart"></i> Mi carrito ({{ cart.length }} productos)</h3>
+        <div class="cart-panel-header">
+          <h3><i class="fas fa-shopping-cart"></i> Mi carrito ({{ cartItemCount }} productos)</h3>
+          <button v-if="cart.length > 0" class="btn-outline btn-sm" @click="clearCart">
+            <i class="fas fa-trash"></i> Vaciar carrito
+          </button>
+        </div>
         <div class="cart-items" v-if="cart.length > 0">
-          <div v-for="(item, index) in cart" :key="index" class="cart-item">
+          <div v-for="item in cart" :key="item.id" class="cart-item">
             <div class="cart-item-info">
               <img :src="item.image" alt="" class="cart-item-image" />
-              <span>{{ item.title }}</span>
+              <div>
+                <span>{{ item.title }}</span>
+                <div class="cart-item-seller">{{ item.seller }}</div>
+              </div>
             </div>
             <div class="cart-item-actions">
-              <span>${{ item.price.toFixed(2) }}</span>
-              <button class="btn-outline" @click="removeFromCart(index)">Eliminar</button>
+              <div class="cart-qty-control">
+                <button class="qty-btn" @click="decrementQty(item)">−</button>
+                <span class="qty-value">{{ item.quantity }}</span>
+                <button class="qty-btn" @click="incrementQty(item)" :disabled="item.quantity >= item.stock">+</button>
+              </div>
+              <span class="cart-item-subtotal">${{ (item.price * item.quantity).toFixed(2) }}</span>
+              <button class="btn-outline btn-sm" @click="removeFromCart(item)">Eliminar</button>
             </div>
           </div>
         </div>
@@ -337,6 +354,30 @@
               <button class="btn-outline" style="margin-top: 0.5rem; width: 100%;" @click="openCompanyChat(selectedProduct)">
                 <i class="fas fa-comment-dots"></i> Chatear con {{ selectedProduct.seller || 'la empresa' }}
               </button>
+
+              <div class="rate-product-box">
+                <p class="rate-product-title">{{ hasExistingRating ? 'Tu calificación' : 'Califica este producto' }}</p>
+                <div class="rate-stars-input">
+                  <span
+                    v-for="n in 5"
+                    :key="n"
+                    class="rate-star"
+                    :class="{ 'rate-star-filled': n <= (myRatingHover || myRatingStars) }"
+                    @mouseenter="myRatingHover = n"
+                    @mouseleave="myRatingHover = 0"
+                    @click="myRatingStars = n"
+                  >★</span>
+                </div>
+                <textarea
+                  v-model="myRatingComment"
+                  class="rate-comment-input"
+                  placeholder="Comentario (opcional)"
+                  rows="2"
+                ></textarea>
+                <button class="btn btn-primary" style="width:100%;" @click="submitRating" :disabled="submittingRating">
+                  {{ submittingRating ? 'Guardando...' : (hasExistingRating ? 'Actualizar calificación' : 'Enviar calificación') }}
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -388,6 +429,17 @@
           <button class="modal-close" @click="closeCheckoutModal">&times;</button>
           <h2>💳 Procesar pago</h2>
           <p class="checkout-total">Total a pagar: <strong>${{ cartTotal.toFixed(2) }}</strong></p>
+
+          <div class="points-redeem-box" v-if="userPoints >= 100">
+            <p class="points-redeem-label">⭐ Tienes {{ userPoints }} puntos acumulados</p>
+            <div class="points-redeem-row">
+              <button class="pts-btn" @click="pointsToRedeem = Math.max(0, pointsToRedeem - 1)" :disabled="pointsToRedeem === 0">−</button>
+              <span>{{ pointsToRedeem * 100 }} pts → ${{ pointsDiscount.toFixed(2) }} de descuento</span>
+              <button class="pts-btn" @click="pointsToRedeem = Math.min(maxRedeemableBlocks, pointsToRedeem + 1)" :disabled="pointsToRedeem >= maxRedeemableBlocks">+</button>
+            </div>
+            <p class="checkout-total-final">Total con descuento: <strong>${{ finalCheckoutTotal.toFixed(2) }}</strong></p>
+          </div>
+
           <div class="payment-methods">
             <div class="payment-method" @click="selectPaymentMethod('card')" :class="{ active: selectedPayment === 'card' }">
               <i class="fas fa-credit-card"></i> Tarjeta de crédito/débito
@@ -441,7 +493,8 @@ export default {
       userName: 'Cliente',
       userEmail: 'cliente@email.com',
       userRole: 'Cliente',
-      userPoints: 1280,
+      userPoints: 0,
+      pointsToRedeem: 0, // en bloques de 100
       currentUserId: null,
 
       // ─── Vistas ──────────────────────────────
@@ -521,6 +574,13 @@ export default {
         loading: false,
       },
       companyChatPollInterval: null,
+
+      // ─── Calificación de productos (reviews reales) ─
+      myRatingStars: 0,
+      myRatingHover: 0,
+      myRatingComment: '',
+      submittingRating: false,
+      hasExistingRating: false,
     }
   },
 
@@ -555,7 +615,22 @@ export default {
       return result
     },
     cartTotal() {
-      return this.cart.reduce((total, item) => total + item.price, 0)
+      return this.cart.reduce((total, item) => total + item.price * item.quantity, 0)
+    },
+    cartItemCount() {
+      return this.cart.reduce((total, item) => total + item.quantity, 0)
+    },
+    maxRedeemableBlocks() {
+      // Cada bloque = 100 puntos = $5 de descuento. No se puede descontar más que el total del carrito.
+      const byPoints = Math.floor(this.userPoints / 100)
+      const byCartValue = Math.floor(this.cartTotal / 5)
+      return Math.max(0, Math.min(byPoints, byCartValue))
+    },
+    pointsDiscount() {
+      return this.pointsToRedeem * 5
+    },
+    finalCheckoutTotal() {
+      return Math.max(0, this.cartTotal - this.pointsDiscount)
     },
     trackingOrder() {
       if (!this.trackingOrderId) return null
@@ -590,7 +665,7 @@ export default {
 
   mounted() {
     this.loadUserProfile()
-    this.loadProducts()
+    this.loadProducts().then(() => this.loadCart())
     // Actualizar contador del mapa cada segundo (segundos desde la última ubicación real)
     setInterval(() => {
       this.mapUpdateSeconds = (this.mapUpdateSeconds % 999) + 1
@@ -621,6 +696,13 @@ export default {
         this.userName = user.user_metadata?.full_name || user.name || user.email || 'Cliente'
         this.userEmail = user.email || 'cliente@email.com'
         this.currentUserId = user.id || null
+
+        if (this.currentUserId) {
+          const profileRes = await insforge.database.from('profiles').select('points').eq('id', this.currentUserId).single()
+          if (!profileRes?.error && typeof profileRes?.data?.points === 'number') {
+            this.userPoints = profileRes.data.points
+          }
+        }
       } catch (err) {
         console.warn('Error cargando perfil de cliente:', err)
       }
@@ -688,7 +770,7 @@ export default {
       this.companyChat.input = ''
       this.companyChat.loading = true
       try {
-        const { error } = await insforge.database.from('messages').insert({
+        const { error } = await insforge.database.from('messages').insert([{
           client_id: this.currentUserId,
           client_name: this.userName,
           company_id: this.companyChat.companyId,
@@ -696,7 +778,7 @@ export default {
           sender_id: this.currentUserId,
           sender_role: 'cliente',
           text,
-        })
+        }])
         if (error) {
           alert('No se pudo enviar el mensaje: ' + (error.message || 'error desconocido'))
           return
@@ -731,31 +813,264 @@ export default {
           category: p.category,
           seller: p.seller_name || 'Unify',
           sellerId: p.seller_id || null,
-          rating: p.rating,
-          reviews: p.reviews,
+          rating: 0,
+          reviews: 0,
           image: p.image,
           description: p.description,
           stock: p.stock,
         }))
+
+        this.loadRealRatingsForProducts()
       } catch (err) {
         console.warn('Error inesperado cargando productos:', err)
       }
     },
 
-    // ─── Carrito ────────────────────────────────
-    addToCart(product) {
-      this.cart.push({ ...product })
+    // Calcula rating/cantidad de reseñas reales desde la tabla `reviews`
+    // (no hay trigger en la base de datos que mantenga products.rating actualizado).
+    async loadRealRatingsForProducts() {
+      if (this.products.length === 0) return
+
+      try {
+        const { data, error } = await insforge.database
+          .from('reviews')
+          .select('product_id,rating')
+
+        if (error || !data) return
+
+        const byProduct = {}
+        data.forEach((r) => {
+          if (!byProduct[r.product_id]) byProduct[r.product_id] = []
+          byProduct[r.product_id].push(r.rating)
+        })
+
+        this.products.forEach((p) => {
+          const ratings = byProduct[p.id]
+          if (ratings && ratings.length > 0) {
+            p.rating = ratings.reduce((a, b) => a + b, 0) / ratings.length
+            p.reviews = ratings.length
+          }
+        })
+      } catch (err) {
+        console.warn('Error inesperado cargando calificaciones:', err)
+      }
     },
-    removeFromCart(index) {
-      this.cart.splice(index, 1)
+
+    // ─── Carrito ────────────────────────────────
+    async loadCart() {
+      if (!this.currentUserId) return
+      try {
+        const { data, error } = await insforge.database
+          .from('cart_items')
+          .select('*')
+          .eq('client_id', this.currentUserId)
+
+        if (error || !data) return
+
+        this.cart = data
+          .map((row) => {
+            const product = this.products.find((p) => p.id === row.product_id)
+            if (!product) return null // producto pausado/eliminado desde que se agregó
+            return { ...product, quantity: row.quantity }
+          })
+          .filter(Boolean)
+      } catch (err) {
+        console.warn('Error cargando el carrito:', err)
+      }
+    },
+
+    async addToCart(product) {
+      if (!this.currentUserId) {
+        alert('Inicia sesión de nuevo para agregar productos al carrito.')
+        return
+      }
+
+      const existing = this.cart.find((item) => item.id === product.id)
+
+      if (existing) {
+        if (existing.quantity >= product.stock) {
+          alert('No hay más stock disponible de este producto.')
+          return
+        }
+        existing.quantity++
+        try {
+          const { error } = await insforge.database
+            .from('cart_items')
+            .update({ quantity: existing.quantity })
+            .eq('client_id', this.currentUserId)
+            .eq('product_id', product.id)
+          if (error) console.warn('No se pudo actualizar la cantidad en el carrito:', error)
+        } catch (err) {
+          console.warn('Error inesperado actualizando el carrito:', err)
+        }
+        return
+      }
+
+      if (product.stock <= 0) {
+        alert('Este producto está agotado.')
+        return
+      }
+
+      this.cart.push({ ...product, quantity: 1 })
+      try {
+        const { error } = await insforge.database.from('cart_items').insert([{
+          client_id: this.currentUserId,
+          product_id: product.id,
+          quantity: 1,
+        }])
+        if (error) console.warn('No se pudo guardar el producto en el carrito:', error)
+      } catch (err) {
+        console.warn('Error inesperado guardando el carrito:', err)
+      }
+    },
+
+    async incrementQty(item) {
+      if (item.quantity >= item.stock) return
+      item.quantity++
+      try {
+        const { error } = await insforge.database
+          .from('cart_items')
+          .update({ quantity: item.quantity })
+          .eq('client_id', this.currentUserId)
+          .eq('product_id', item.id)
+        if (error) console.warn('No se pudo actualizar la cantidad:', error)
+      } catch (err) {
+        console.warn('Error inesperado actualizando cantidad:', err)
+      }
+    },
+
+    async decrementQty(item) {
+      if (item.quantity <= 1) {
+        await this.removeFromCart(item)
+        return
+      }
+      item.quantity--
+      try {
+        const { error } = await insforge.database
+          .from('cart_items')
+          .update({ quantity: item.quantity })
+          .eq('client_id', this.currentUserId)
+          .eq('product_id', item.id)
+        if (error) console.warn('No se pudo actualizar la cantidad:', error)
+      } catch (err) {
+        console.warn('Error inesperado actualizando cantidad:', err)
+      }
+    },
+
+    async removeFromCart(item) {
+      this.cart = this.cart.filter((i) => i.id !== item.id)
+      try {
+        const { error } = await insforge.database
+          .from('cart_items')
+          .delete()
+          .eq('client_id', this.currentUserId)
+          .eq('product_id', item.id)
+        if (error) console.warn('No se pudo quitar el producto del carrito:', error)
+      } catch (err) {
+        console.warn('Error inesperado quitando del carrito:', err)
+      }
+    },
+
+    async clearCart() {
+      if (this.cart.length === 0) return
+      this.cart = []
+      try {
+        const { error } = await insforge.database
+          .from('cart_items')
+          .delete()
+          .eq('client_id', this.currentUserId)
+        if (error) console.warn('No se pudo vaciar el carrito:', error)
+      } catch (err) {
+        console.warn('Error inesperado vaciando el carrito:', err)
+      }
     },
 
     // ─── Modal detalle producto ────────────────
     showProductDetail(product) {
       this.selectedProduct = product
+      this.loadMyReviewForProduct(product.id)
     },
     closeProductDetail() {
       this.selectedProduct = null
+      this.myRatingStars = 0
+      this.myRatingHover = 0
+      this.myRatingComment = ''
+      this.hasExistingRating = false
+    },
+
+    // ─── Calificación de productos (reviews reales) ─
+    async loadMyReviewForProduct(productId) {
+      this.myRatingStars = 0
+      this.myRatingHover = 0
+      this.myRatingComment = ''
+      this.hasExistingRating = false
+      if (!this.currentUserId || !productId) return
+
+      try {
+        const { data, error } = await insforge.database
+          .from('reviews')
+          .select('rating,comment')
+          .eq('product_id', productId)
+          .eq('client_id', this.currentUserId)
+          .single()
+
+        if (!error && data) {
+          this.myRatingStars = data.rating || 0
+          this.myRatingComment = data.comment || ''
+          this.hasExistingRating = true
+        }
+      } catch (err) {
+        // Sin reseña previa todavía: no es un error, es el caso normal.
+      }
+    },
+
+    async submitRating() {
+      if (!this.myRatingStars) {
+        alert('Selecciona al menos 1 estrella antes de enviar tu calificación.')
+        return
+      }
+      if (!this.currentUserId) {
+        alert('Inicia sesión de nuevo para poder calificar este producto.')
+        return
+      }
+      if (!this.selectedProduct?.id) return
+
+      this.submittingRating = true
+      try {
+        const payload = {
+          product_id: this.selectedProduct.id,
+          seller_id: this.selectedProduct.sellerId,
+          client_id: this.currentUserId,
+          client_name: this.userName,
+          rating: this.myRatingStars,
+          comment: this.myRatingComment.trim() || null,
+        }
+
+        let error
+        if (this.hasExistingRating) {
+          ;({ error } = await insforge.database
+            .from('reviews')
+            .update(payload)
+            .eq('product_id', this.selectedProduct.id)
+            .eq('client_id', this.currentUserId))
+        } else {
+          ;({ error } = await insforge.database.from('reviews').insert([payload]))
+        }
+
+        if (error) {
+          alert('No se pudo guardar tu calificación: ' + (error.message || 'error desconocido'))
+          return
+        }
+
+        this.hasExistingRating = true
+        await this.loadRealRatingsForProducts()
+        alert('¡Gracias por tu calificación!')
+      } catch (err) {
+        console.warn('Error inesperado guardando calificación:', err)
+        alert('Error inesperado guardando tu calificación.')
+      } finally {
+        this.submittingRating = false
+      }
     },
 
     // ─── Modal pago ─────────────────────────────
@@ -763,6 +1078,7 @@ export default {
       if (this.cart.length === 0) return
       this.showCheckoutModal = true
       this.selectedPayment = null
+      this.pointsToRedeem = 0
     },
     closeCheckoutModal() {
       this.showCheckoutModal = false
@@ -774,14 +1090,19 @@ export default {
     generateOrderRef() {
       return 'UNI-' + Date.now().toString().slice(-6)
     },
-    confirmPayment() {
+    async confirmPayment() {
       if (!this.selectedPayment) return
-      alert(`🎉 ¡Pago exitoso! Has pagado $${this.cartTotal.toFixed(2)} con ${this.selectedPayment}.`)
+
+      const totalPaid = this.finalCheckoutTotal
+      const pointsUsed = this.pointsToRedeem * 100
+      const pointsEarned = Math.floor(totalPaid)
+
+      alert(`🎉 ¡Pago exitoso! Has pagado $${totalPaid.toFixed(2)} con ${this.selectedPayment}.`)
       // Crear nuevo pedido
       const newOrder = {
         id: this.generateOrderRef(),
         date: new Date().toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' }),
-        total: this.cartTotal,
+        total: totalPaid,
         status: 'En proceso',
         driverId: null,
         driverName: null
@@ -793,8 +1114,73 @@ export default {
       this.orders.unshift(newOrder)
       this.initChatForOrder(newOrder.id, randomDriver.name)
 
-      this.cart = []
+      // ─ Actualizar puntos reales en InsForge (ganar - canjeados) ─
+      if (this.currentUserId) {
+        const newPointsBalance = this.userPoints - pointsUsed + pointsEarned
+        try {
+          const { error } = await insforge.database.from('profiles').update({ points: newPointsBalance }).eq('id', this.currentUserId)
+          if (!error) {
+            this.userPoints = newPointsBalance
+          } else {
+            console.warn('No se pudieron actualizar los puntos:', error)
+          }
+        } catch (err) {
+          console.warn('Error actualizando puntos:', err)
+        }
+      }
+
+      // ─ Registrar la venta real (para reportes de la empresa) y descontar stock ─
+      await this.registerSaleAndUpdateStock(newOrder.id)
+
+      this.pointsToRedeem = 0
+      await this.clearCart()
       this.closeCheckoutModal()
+    },
+
+    async registerSaleAndUpdateStock(orderRef) {
+      if (this.cart.length === 0) return
+
+      // 1) Una fila por UNIDAD vendida (respetando cantidad), para reportes reales
+      const saleRows = []
+      this.cart.forEach((item) => {
+        for (let i = 0; i < item.quantity; i++) {
+          saleRows.push({
+            order_ref: orderRef,
+            product_id: item.id,
+            seller_id: item.sellerId,
+            product_title: item.title,
+            category: item.category,
+            unit_price: item.price,
+            client_id: this.currentUserId,
+            client_name: this.userName,
+          })
+        }
+      })
+
+      try {
+        const { error } = await insforge.database.from('sales').insert(saleRows)
+        if (error) console.warn('No se pudo registrar la venta:', error)
+      } catch (err) {
+        console.warn('Error inesperado registrando la venta:', err)
+      }
+
+      // 2) Descontar stock real según la cantidad comprada de cada producto
+      const qtyByProduct = {}
+      this.cart.forEach((item) => {
+        qtyByProduct[item.id] = (qtyByProduct[item.id] || 0) + item.quantity
+      })
+
+      for (const [productId, qty] of Object.entries(qtyByProduct)) {
+        const cachedProduct = this.products.find((p) => p.id === productId)
+        if (!cachedProduct || typeof cachedProduct.stock !== 'number') continue
+        const newStock = Math.max(0, cachedProduct.stock - qty)
+        try {
+          const { error } = await insforge.database.from('products').update({ stock: newStock }).eq('id', productId)
+          if (!error) cachedProduct.stock = newStock
+        } catch (err) {
+          console.warn('No se pudo actualizar el stock del producto', productId, err)
+        }
+      }
     },
 
     // ─── Pedidos ─────────────────────────────────
@@ -1125,6 +1511,23 @@ header img {
   background: #fee2e2;
   color: #ef4444;
 }
+.cart-nav-item {
+  position: relative;
+}
+.cart-nav-badge {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  background: #ef4444;
+  color: white;
+  font-size: 0.68rem;
+  font-weight: 700;
+  line-height: 1;
+  padding: 0.2rem 0.4rem;
+  border-radius: 999px;
+  min-width: 16px;
+  text-align: center;
+}
 
 /* ── Contenedor principal ────────────────────── */
 .dashboard-container {
@@ -1340,6 +1743,12 @@ header img {
   max-height: 250px;
   overflow-y: auto;
 }
+.cart-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
 .cart-item {
   display: flex;
   justify-content: space-between;
@@ -1359,10 +1768,43 @@ header img {
   object-fit: cover;
   border-radius: 8px;
 }
+.cart-item-seller {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
 .cart-item-actions {
   display: flex;
   align-items: center;
   gap: 1rem;
+}
+.cart-qty-control {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+.qty-btn {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: white;
+  cursor: pointer;
+  line-height: 1;
+  font-size: 1rem;
+}
+.qty-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.qty-value {
+  min-width: 18px;
+  text-align: center;
+  font-weight: 600;
+}
+.cart-item-subtotal {
+  font-weight: 600;
+  min-width: 60px;
+  text-align: right;
 }
 .cart-empty {
   text-align: center;
@@ -1588,6 +2030,45 @@ header img {
   gap: 0.3rem;
   margin: 0.5rem 0;
 }
+.rate-product-box {
+  margin-top: 1rem;
+  padding: 0.9rem;
+  border-radius: 12px;
+  background: var(--off-white, #f8faf9);
+  border: 1px solid #e2e8f0;
+}
+.rate-product-title {
+  margin: 0 0 0.5rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-dark, #1a202c);
+}
+.rate-stars-input {
+  display: flex;
+  gap: 0.3rem;
+  margin-bottom: 0.6rem;
+}
+.rate-star {
+  font-size: 1.6rem;
+  cursor: pointer;
+  color: #d1d5db;
+  user-select: none;
+  transition: color 0.15s ease;
+}
+.rate-star-filled {
+  color: #f59e0b;
+}
+.rate-comment-input {
+  width: 100%;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 0.5rem 0.6rem;
+  font-family: inherit;
+  font-size: 0.85rem;
+  resize: vertical;
+  margin-bottom: 0.6rem;
+  box-sizing: border-box;
+}
 .detail-price {
   font-size: 1.8rem;
   font-weight: 700;
@@ -1611,6 +2092,48 @@ header img {
 .checkout-total {
   font-size: 1.2rem;
   margin: 1rem 0;
+}
+.points-redeem-box {
+  background: #fffbea;
+  border: 1px solid #fbbf24;
+  border-radius: 12px;
+  padding: 0.9rem 1rem;
+  margin-bottom: 1rem;
+}
+.points-redeem-label {
+  margin: 0 0 0.5rem;
+  font-size: 0.9rem;
+  color: #92400e;
+  font-weight: 600;
+}
+.points-redeem-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  font-size: 0.85rem;
+  color: #4a5568;
+}
+.pts-btn {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 1px solid #fbbf24;
+  background: white;
+  color: #92400e;
+  font-size: 1rem;
+  cursor: pointer;
+  line-height: 1;
+}
+.pts-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.checkout-total-final {
+  text-align: center;
+  margin: 0.6rem 0 0;
+  font-size: 0.95rem;
+  color: #005e59;
 }
 .payment-methods {
   display: flex;

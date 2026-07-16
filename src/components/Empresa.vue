@@ -865,6 +865,38 @@
         <div class="reports-grid">
           <div class="card-panel report-card">
             <div class="report-header">
+              <h4>Ingresos: este mes vs. anterior</h4>
+              <span class="report-period">Comparativo</span>
+            </div>
+            <div class="revenue-compare">
+              <div class="revenue-now">
+                <span class="revenue-amount">${{ revenueThisMonth.toFixed(2) }}</span>
+                <span class="revenue-label">Este mes</span>
+              </div>
+              <div class="revenue-change" :class="revenueChangePercent >= 0 ? 'positive' : 'negative'">
+                <i :class="revenueChangePercent >= 0 ? 'fas fa-arrow-up' : 'fas fa-arrow-down'"></i>
+                {{ Math.abs(revenueChangePercent) }}%
+              </div>
+              <div class="revenue-prev">
+                <span class="revenue-amount-sm">${{ revenueLastMonth.toFixed(2) }}</span>
+                <span class="revenue-label">Mes anterior</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="card-panel report-card">
+            <div class="report-header">
+              <h4>Ticket promedio</h4>
+              <span class="report-period">Por pedido</span>
+            </div>
+            <div class="avg-ticket-display">
+              <span class="avg-ticket-amount">${{ averageTicket.toFixed(2) }}</span>
+              <span class="avg-ticket-hint">promedio gastado por pedido</span>
+            </div>
+          </div>
+
+          <div class="card-panel report-card">
+            <div class="report-header">
               <h4>Ventas mensuales</h4>
               <span class="report-period">Últimos 6 meses</span>
             </div>
@@ -883,16 +915,52 @@
               <h4>Productos más vendidos</h4>
               <span class="report-period">Top 5</span>
             </div>
-            <div class="top-products">
+            <div class="top-products" v-if="topProducts.length > 0">
               <div v-for="(p, i) in topProducts" :key="i" class="top-product">
                 <span class="top-rank">{{ i + 1 }}</span>
                 <span class="top-name">{{ p.name }}</span>
                 <span class="top-sales">{{ p.sales }} ventas</span>
               </div>
             </div>
+            <p v-else class="report-empty-hint">Todavía no hay ventas registradas.</p>
+          </div>
+
+          <div class="card-panel report-card">
+            <div class="report-header">
+              <h4>Ventas por categoría</h4>
+              <span class="report-period">% de ingresos</span>
+            </div>
+            <div class="category-bars" v-if="salesByCategory.length > 0">
+              <div v-for="(c, i) in salesByCategory" :key="i" class="category-bar-row">
+                <span class="category-name">{{ c.category }}</span>
+                <div class="category-bar-track">
+                  <div class="category-bar-fill" :style="{ width: c.percent + '%' }"></div>
+                </div>
+                <span class="category-percent">{{ c.percent }}%</span>
+              </div>
+            </div>
+            <p v-else class="report-empty-hint">Todavía no hay ventas registradas.</p>
+          </div>
+
+          <div class="card-panel report-card">
+            <div class="report-header">
+              <h4>⚠️ Alerta de quiebre de stock</h4>
+              <span class="report-period">Proyección según ritmo de venta</span>
+            </div>
+            <div class="stockout-list" v-if="stockoutAlerts.length > 0">
+              <div v-for="p in stockoutAlerts" :key="p.id" class="stockout-item">
+                <img :src="p.image" alt="" class="stockout-thumb" @error="$event.target.src='https://via.placeholder.com/32/edf7f5/005e59?text=?'" />
+                <span class="stockout-name">{{ p.title }}</span>
+                <span class="stockout-days" :class="p.daysRemaining <= 3 ? 'critical' : 'warning'">
+                  Se agota en ~{{ p.daysRemaining }} día{{ p.daysRemaining === 1 ? '' : 's' }}
+                </span>
+              </div>
+            </div>
+            <p v-else class="report-empty-hint">Ningún producto en riesgo de agotarse pronto 👍</p>
           </div>
         </div>
       </template>
+
 
       <!-- ════════════════════════════════════════
            VISTA: MENSAJES (Chat + Mapa)
@@ -1223,13 +1291,6 @@ export default {
       ],
 
       // ─── Dashboard ────────────────────────────────
-      stats: [
-        { icon: '💰', label: 'Ventas del mes', value: '$284,500', color: 'var(--green-600)', trend: '+12% vs mes anterior', trendUp: true },
-        { icon: '📦', label: 'Pedidos pendientes', value: '342', color: 'var(--sky-600)', trend: '+8 desde ayer', trendUp: true },
-        { icon: '👥', label: 'Clientes activos', value: '1,284', color: 'var(--green-400)', trend: '+34 esta semana', trendUp: true },
-        { icon: '⭐', label: 'Calificación promedio', value: '4.8', color: '#f59e0b', trend: '-0.1 este mes', trendUp: false },
-      ],
-
       orders: [
         { id: '#4521', client: 'Ana Martínez', total: '$45.00', status: 'Pendiente', products: '2 productos', date: '2024-12-15' },
         { id: '#4522', client: 'Luis Pérez', total: '$128.00', status: 'Enviado', products: '1 producto', date: '2024-12-15' },
@@ -1239,23 +1300,8 @@ export default {
         { id: '#4526', client: 'Roberto Silva', total: '$312.00', status: 'Entregado', products: '5 productos', date: '2024-12-13' },
       ],
 
-      salesData: [
-        { label: 'Lunes', amount: 1245 },
-        { label: 'Martes', amount: 1890 },
-        { label: 'Miércoles', amount: 2340 },
-        { label: 'Jueves', amount: 1567 },
-        { label: 'Viernes', amount: 2890 },
-        { label: 'Sábado', amount: 1980 },
-      ],
-
-      monthlySales: [
-        { label: 'Jul', amount: 12000 },
-        { label: 'Ago', amount: 15000 },
-        { label: 'Sep', amount: 18000 },
-        { label: 'Oct', amount: 22000 },
-        { label: 'Nov', amount: 25000 },
-        { label: 'Dic', amount: 28450 },
-      ],
+      realSalesRecords: [], // se llena desde InsForge (tabla sales) al montar — ventas reales por producto
+      realReviewsRecords: [], // se llena desde InsForge (tabla reviews) al montar — reseñas reales de mis productos
 
       lowStockProducts: [
         { id: 1, icon: '💻', name: 'Laptop Dell XPS', stock: 3, sku: 'DELL-XPS-001' },
@@ -1269,14 +1315,6 @@ export default {
         { id: 2, initials: 'AR', name: 'Ana Rodríguez', zone: 'Zona Norte', deliveries: 2, status: 'Activo', rating: '4.7' },
         { id: 3, initials: 'LP', name: 'Luis Pérez', zone: 'Zona Este', deliveries: 0, status: 'Descanso', rating: '4.5' },
         { id: 4, initials: 'MG', name: 'María González', zone: 'Zona Oeste', deliveries: 4, status: 'En ruta', rating: '5.0' },
-      ],
-
-      topProducts: [
-        { name: 'Laptop Dell XPS', sales: 156 },
-        { name: 'Audífonos Sony', sales: 234 },
-        { name: 'Monitor 24"', sales: 89 },
-        { name: 'Teclado Mecánico', sales: 78 },
-        { name: 'Sofá Premium', sales: 23 },
       ],
 
       notifications: [
@@ -1383,8 +1421,185 @@ export default {
       }
       return result
     },
-    maxSales() { return Math.max(...this.salesData.map(d => d.amount)) },
-    maxMonthly() { return Math.max(...this.monthlySales.map(d => d.amount)) },
+    salesData() {
+      // Últimos 6 días (Lun-Sáb de la semana actual), ingresos reales desde `sales`
+      const dayLabels = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado']
+      const now = new Date()
+      const startOfWeek = new Date(now)
+      startOfWeek.setDate(now.getDate() - now.getDay() + 1) // lunes de esta semana
+      startOfWeek.setHours(0, 0, 0, 0)
+
+      const days = []
+      for (let i = 0; i < 6; i++) {
+        const d = new Date(startOfWeek)
+        d.setDate(startOfWeek.getDate() + i)
+        days.push({ key: d.toDateString(), label: dayLabels[d.getDay()], amount: 0 })
+      }
+
+      this.realSalesRecords.forEach((s) => {
+        const d = new Date(s.created_at)
+        const bucket = days.find((day) => day.key === d.toDateString())
+        if (bucket) bucket.amount += Number(s.unit_price) || 0
+      })
+
+      return days
+    },
+    maxSales() {
+      const max = Math.max(...this.salesData.map(d => d.amount))
+      return max > 0 ? max : 1 // evita dividir por 0 si aún no hay ventas esta semana
+    },
+    activeClientsCount() {
+      return new Set(this.realSalesRecords.map((s) => s.client_id).filter(Boolean)).size
+    },
+    ordersThisMonthCount() {
+      const now = new Date()
+      const refs = this.realSalesRecords
+        .filter((s) => {
+          const d = new Date(s.created_at)
+          return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth()
+        })
+        .map((s) => s.order_ref)
+      return new Set(refs).size
+    },
+    averageProductRating() {
+      if (this.realReviewsRecords.length === 0) return null
+      const sum = this.realReviewsRecords.reduce((acc, r) => acc + (Number(r.rating) || 0), 0)
+      return sum / this.realReviewsRecords.length
+    },
+    stats() {
+      return [
+        {
+          icon: '💰',
+          label: 'Ventas del mes',
+          value: `$${this.revenueThisMonth.toFixed(2)}`,
+          color: 'var(--green-600)',
+          trend: this.revenueLastMonth > 0 ? `${this.revenueChangePercent >= 0 ? '+' : ''}${this.revenueChangePercent}% vs mes anterior` : 'Sin datos del mes anterior',
+          trendUp: this.revenueChangePercent >= 0,
+        },
+        {
+          icon: '📦',
+          label: 'Pedidos este mes',
+          value: String(this.ordersThisMonthCount),
+          color: 'var(--sky-600)',
+          trend: 'Basado en ventas reales',
+          trendUp: true,
+        },
+        {
+          icon: '👥',
+          label: 'Clientes activos',
+          value: String(this.activeClientsCount),
+          color: 'var(--green-400)',
+          trend: 'Clientes distintos que te han comprado',
+          trendUp: true,
+        },
+        {
+          icon: '⭐',
+          label: 'Calificación promedio',
+          value: this.averageProductRating !== null ? this.averageProductRating.toFixed(1) : 'Sin calificaciones',
+          color: '#f59e0b',
+          trend: this.averageProductRating !== null ? 'Basado en reseñas reales' : 'Aún no tienes reseñas',
+          trendUp: true,
+        },
+      ]
+    },
+    monthlySales() {
+      // Últimos 6 meses (incluyendo el actual), agrupando las ventas reales por mes
+      const now = new Date()
+      const months = []
+      for (let i = 5; i >= 0; i--) {
+        const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
+        months.push({
+          key: `${d.getFullYear()}-${d.getMonth()}`,
+          label: d.toLocaleDateString('es-ES', { month: 'short' }),
+          amount: 0,
+        })
+      }
+      this.realSalesRecords.forEach((s) => {
+        const d = new Date(s.created_at)
+        const key = `${d.getFullYear()}-${d.getMonth()}`
+        const bucket = months.find((m) => m.key === key)
+        if (bucket) bucket.amount += Number(s.unit_price) || 0
+      })
+      return months
+    },
+    maxMonthly() {
+      const max = Math.max(...this.monthlySales.map(d => d.amount))
+      return max > 0 ? max : 1 // evita dividir por 0 en las barras si aún no hay ventas
+    },
+    topProducts() {
+      const grouped = {}
+      this.realSalesRecords.forEach((s) => {
+        const name = s.product_title || 'Producto'
+        grouped[name] = (grouped[name] || 0) + 1
+      })
+      return Object.entries(grouped)
+        .map(([name, sales]) => ({ name, sales }))
+        .sort((a, b) => b.sales - a.sales)
+        .slice(0, 5)
+    },
+    salesByCategory() {
+      const grouped = {}
+      this.realSalesRecords.forEach((s) => {
+        const cat = s.category || 'Sin categoría'
+        grouped[cat] = (grouped[cat] || 0) + (Number(s.unit_price) || 0)
+      })
+      const total = Object.values(grouped).reduce((a, b) => a + b, 0) || 1
+      return Object.entries(grouped)
+        .map(([category, revenue]) => ({ category, revenue, percent: Math.round((revenue / total) * 100) }))
+        .sort((a, b) => b.revenue - a.revenue)
+    },
+    averageTicket() {
+      const uniqueOrders = new Set(this.realSalesRecords.map((s) => s.order_ref))
+      const totalRevenue = this.realSalesRecords.reduce((sum, s) => sum + (Number(s.unit_price) || 0), 0)
+      return uniqueOrders.size > 0 ? totalRevenue / uniqueOrders.size : 0
+    },
+    revenueThisMonth() {
+      const now = new Date()
+      return this.realSalesRecords
+        .filter((s) => {
+          const d = new Date(s.created_at)
+          return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth()
+        })
+        .reduce((sum, s) => sum + (Number(s.unit_price) || 0), 0)
+    },
+    revenueLastMonth() {
+      const now = new Date()
+      const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1)
+      return this.realSalesRecords
+        .filter((s) => {
+          const d = new Date(s.created_at)
+          return d.getFullYear() === lastMonth.getFullYear() && d.getMonth() === lastMonth.getMonth()
+        })
+        .reduce((sum, s) => sum + (Number(s.unit_price) || 0), 0)
+    },
+    revenueChangePercent() {
+      if (this.revenueLastMonth === 0) return this.revenueThisMonth > 0 ? 100 : 0
+      return Math.round(((this.revenueThisMonth - this.revenueLastMonth) / this.revenueLastMonth) * 100)
+    },
+    stockoutAlerts() {
+      // Velocidad de venta real en los últimos 30 días, por producto
+      const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000
+      const cutoff = Date.now() - THIRTY_DAYS_MS
+      const soldLast30ByProduct = {}
+
+      this.realSalesRecords.forEach((s) => {
+        const t = new Date(s.created_at).getTime()
+        if (t >= cutoff) {
+          soldLast30ByProduct[s.product_id] = (soldLast30ByProduct[s.product_id] || 0) + 1
+        }
+      })
+
+      return this.publishedProducts
+        .map((p) => {
+          const soldLast30 = soldLast30ByProduct[p.id] || 0
+          const dailyVelocity = soldLast30 / 30
+          if (dailyVelocity <= 0 || p.stock <= 0) return null
+          const daysRemaining = Math.round(p.stock / dailyVelocity)
+          return { ...p, daysRemaining }
+        })
+        .filter((p) => p && p.daysRemaining <= 14)
+        .sort((a, b) => a.daysRemaining - b.daysRemaining)
+    },
     weeklyTotal() { return this.salesData.reduce((a, d) => a + d.amount, 0) },
     activeShipments() { return this.activeShipmentsList.length },
     discountPercent() {
@@ -1467,6 +1682,8 @@ export default {
   mounted() { 
     this.loadCompanyProfile()
     this.loadMyProducts()
+    this.loadSalesData()
+    this.loadReviewsData()
     document.addEventListener('click', this.closeProfileMenuOutside)
     // Simular actualización del mapa
     setInterval(() => {
@@ -1596,7 +1813,7 @@ export default {
       this.clientChatInput = ''
       this.clientChatLoading = true
       try {
-        const { error } = await insforge.database.from('messages').insert({
+        const { error } = await insforge.database.from('messages').insert([{
           client_id: this.selectedClientId,
           client_name: this.selectedClientName,
           company_id: this.companyId,
@@ -1604,7 +1821,7 @@ export default {
           sender_id: this.companyId,
           sender_role: 'empresa',
           text,
-        })
+        }])
         if (error) {
           alert('No se pudo enviar el mensaje: ' + (error.message || 'error desconocido'))
           return
@@ -1810,7 +2027,7 @@ export default {
         const userId = userData?.user?.id
         if (userError || !userId) return
 
-        const { data, error } = await insforge
+        const { data, error } = await insforge.database
           .from('products')
           .select('*')
           .eq('seller_id', userId)
@@ -1821,6 +2038,44 @@ export default {
         }
       } catch (err) {
         console.warn('Error cargando productos de la empresa:', err)
+      }
+    },
+    async loadSalesData() {
+      try {
+        const { data: userData, error: userError } = await insforge.auth.getCurrentUser()
+        const userId = userData?.user?.id
+        if (userError || !userId) return
+
+        const { data, error } = await insforge.database
+          .from('sales')
+          .select('*')
+          .eq('seller_id', userId)
+          .order('created_at', { ascending: false })
+
+        if (!error && data) {
+          this.realSalesRecords = data
+        }
+      } catch (err) {
+        console.warn('Error cargando datos de ventas:', err)
+      }
+    },
+    async loadReviewsData() {
+      try {
+        const { data: userData, error: userError } = await insforge.auth.getCurrentUser()
+        const userId = userData?.user?.id
+        if (userError || !userId) return
+
+        const { data, error } = await insforge.database
+          .from('reviews')
+          .select('*')
+          .eq('seller_id', userId)
+          .order('created_at', { ascending: false })
+
+        if (!error && data) {
+          this.realReviewsRecords = data
+        }
+      } catch (err) {
+        console.warn('Error cargando reseñas:', err)
       }
     },
     async saveProduct(status) {
@@ -2071,7 +2326,7 @@ export default {
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
-  margin: 0;
+  margin-left: 40px;
 }
 .market-header h1 span { 
   background: linear-gradient(135deg, #0B3C6D 0%, #3A7DBF 100%);
@@ -3472,6 +3727,143 @@ export default {
   padding: 0.1rem 0.5rem;
   border-radius: 40px;
 }
+
+.report-empty-hint {
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  text-align: center;
+  padding: 1rem 0;
+}
+
+/* ── Ingresos: este mes vs. anterior ── */
+.revenue-compare {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.5rem 0 1rem;
+}
+.revenue-now, .revenue-prev {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.revenue-amount {
+  font-size: 1.6rem;
+  font-weight: 700;
+  color: var(--text-dark);
+}
+.revenue-amount-sm {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+.revenue-label {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  margin-top: 0.2rem;
+}
+.revenue-change {
+  font-size: 0.95rem;
+  font-weight: 700;
+  padding: 0.3rem 0.7rem;
+  border-radius: 40px;
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+.revenue-change.positive { background: #dcfce7; color: #16a34a; }
+.revenue-change.negative { background: #fee2e2; color: #dc2626; }
+
+/* ── Ticket promedio ── */
+.avg-ticket-display {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 1.2rem 0;
+}
+.avg-ticket-amount {
+  font-size: 2rem;
+  font-weight: 700;
+  color: var(--green-600, #059669);
+}
+.avg-ticket-hint {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  margin-top: 0.3rem;
+}
+
+/* ── Ventas por categoría ── */
+.category-bars {
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+}
+.category-bar-row {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+.category-name {
+  font-size: 0.8rem;
+  width: 90px;
+  flex-shrink: 0;
+  color: var(--text-dark);
+}
+.category-bar-track {
+  flex: 1;
+  height: 10px;
+  background: var(--off-white);
+  border-radius: 20px;
+  overflow: hidden;
+}
+.category-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--sky-400), var(--sky-600));
+  border-radius: 20px;
+  transition: width 0.5s ease;
+}
+.category-percent {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  width: 34px;
+  text-align: right;
+}
+
+/* ── Alerta de quiebre de stock ── */
+.stockout-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+.stockout-item {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.45rem 0.5rem;
+  border-radius: 8px;
+  background: var(--off-white);
+}
+.stockout-thumb {
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
+  object-fit: cover;
+}
+.stockout-name {
+  flex: 1;
+  font-size: 0.85rem;
+  font-weight: 500;
+}
+.stockout-days {
+  font-size: 0.72rem;
+  padding: 0.2rem 0.6rem;
+  border-radius: 40px;
+  white-space: nowrap;
+}
+.stockout-days.warning { background: #fef3c7; color: #92400e; }
+.stockout-days.critical { background: #fee2e2; color: #dc2626; }
+
 
 /* ══════════════════════════════════════════
    ORDERS FILTERS (igual que antes)
