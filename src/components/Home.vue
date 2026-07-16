@@ -47,8 +47,8 @@
         <div class="hero-social-proof fade-up delay-4">
           <div class="avatars">
             <img src="https://pbs.twimg.com/profile_images/1273327825471320069/CIavLpX4.png" alt="" />
-            <img src="https://scontent-mia5-1.xx.fbcdn.net/v/t39.30808-6/481260247_23884307454491664_597946207221116949_n.jpg?stp=dst-jpg_tt6&cstp=mx400x400&ctp=s400x400&_nc_cat=104&ccb=1-7&_nc_sid=833d8c&_nc_ohc=APd5tAb17uAQ7kNvwFKYIkc&_nc_oc=AdrH2Hbz1WuhLmUW6fhNNo43z0RFOBNxvwkoCEO5Fu2mNhQlXzB_1YQIWM-1W_5n7So&_nc_zt=23&_nc_ht=scontent-mia5-1.xx&_nc_gid=9LZFfiFbDbdklpwV-JM3bA&_nc_ss=7b289&oh=00_Af-4txs4iRT63x4F-Kv1qkxNTpJ8iZPujVGwzmqwxV51TA&oe=6A3E42C9" alt="" />
-            <img src="https://scontent-mia3-2.xx.fbcdn.net/v/t39.30808-6/710079301_122201271584448334_6278234518965118189_n.jpg?stp=dst-jpg_tt6&cstp=mx2048x2048&ctp=s2048x2048&_nc_cat=105&ccb=1-7&_nc_sid=6ee11a&_nc_ohc=XcxNwpIWMHsQ7kNvwFjRK8h&_nc_oc=AdpSqk3Ng1ZiTxxoYKEuERFriFXDkktB7d0z7XIq9nzJGoq0B9COgki3XlwUFCZKlY4&_nc_zt=23&_nc_ht=scontent-mia3-2.xx&_nc_gid=Ef_SM3_fun4TfvuaNN7MRg&_nc_ss=7b289&oh=00_Af_nbR_7bxYxUO9rEYwokGrqcDaopE2wyL_0YSeEyOSJ1Q&oe=6A3E51D5" alt="" />
+            <img src="https://pedroroque.net/wp-content/uploads/2020/03/pan-sinai-300x300.png" alt="" />
+            <img src="https://scontent-hou1-1.cdninstagram.com/v/t51.82787-19/696704437_18360779311300058_243767840732834882_n.jpg?stp=dst-jpg_s150x150_tt6&efg=eyJ2ZW5jb2RlX3RhZyI6InByb2ZpbGVfcGljLmRqYW5nby41OTEuYzIifQ&_nc_ht=scontent-hou1-1.cdninstagram.com&_nc_cat=102&_nc_oc=Q6cZ2gGQyrtr42ODeAa0gBM09JfvHAh7N8ynd6ASzXBIoHq-DpL_hpipDar3acg_pcTfiME&_nc_ohc=XGs4KoaKf7YQ7kNvwF6GWdG&_nc_gid=ejRlg-PlKuHzvPUKygIGHg&edm=AOQ1c0wBAAAA&ccb=7-5&oh=00_AQBWQJd30GX9mVNWUut0XlwehggKSWdpHqPD1T2xQNLy3A&oe=6A5F0233&_nc_sid=8b3546" alt="" />
           </div>
           <p class="proof-text"><strong>+180 empresas</strong><br />optimizan su distribución con Unify</p>
         </div>
