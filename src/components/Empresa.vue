@@ -1184,15 +1184,18 @@
         <span class="footer-version">v2.0</span>
       </div>
     </footer>
+    <ChatbotWidget context="empresa" :user-name="companyName" :context-data="{ currentView }" />
   </div>
 </template>
 
 <script>
 import { insforge } from '../insforgeClient.js'
+import ChatbotWidget from './ChatbotWidget.vue'
 
 export default {
   name: 'EmpresaDashboard',
   emits: ['switch-view'],
+  components: { ChatbotWidget },
 
   data() {
     return {

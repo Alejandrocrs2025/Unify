@@ -476,6 +476,7 @@
     <footer>
       © 2026 Unify - Tu tienda en línea | Envíos gratis en compras mayores a $50
     </footer>
+    <ChatbotWidget context="cliente" :user-name="userName" :context-data="{ currentView, cartItemCount }" />
   </div>
 </template>
 
@@ -484,9 +485,14 @@ import { insforge } from '../insforgeClient.js'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 
+// Chatbot 
+import ChatbotWidget from './ChatbotWidget.vue'
+
+
 export default {
   name: 'ClienteDashboard',
   emits: ['switch-view'],
+  components: { ChatbotWidget },
   data() {
     return {
       // ─── Usuario ──────────────────────────────
@@ -1417,6 +1423,7 @@ export default {
     },
   },
 }
+// chatbot
 </script>
 
 <style>
