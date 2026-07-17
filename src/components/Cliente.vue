@@ -96,49 +96,74 @@
            VISTA: PRODUCTOS (con búsqueda y filtros)
       ════════════════════════════════════════ -->
       <template v-if="currentView === 'products'">
-        <div class="catalog-search-bar">
-          <div class="search-wrap">
-            <i class="fas fa-search"></i>
-            <input v-model="searchQuery" type="text" placeholder="Buscar productos…" />
+        <!-- ── Paso 1: lista de empresas (catálogo agrupado) ── -->
+        <div v-if="!selectedCompanyId" class="companies-grid">
+          <div
+            v-for="company in companiesList"
+            :key="company.id || company.name"
+            class="company-card"
+            @click="selectCompany(company.id)"
+          >
+            <div class="company-card-image">
+              <img :src="company.image" :alt="company.name" @error="handleImageError" />
+            </div>
+            <div class="company-card-info">
+              <div class="company-card-name">{{ company.name }}</div>
+              <div class="company-card-count">{{ company.count }} producto{{ company.count === 1 ? '' : 's' }}</div>
+            </div>
           </div>
-          <div class="catalog-filters">
-            <select v-model="selectedCategory" class="sel">
-              <option value="Todos">Todas las categorías</option>
-              <option v-for="cat in categories" :key="cat" :value="cat">{{ cat }}</option>
-            </select>
-            <select v-model="sortOption" class="sel">
-              <option value="recent">Más recientes</option>
-              <option value="price-low">Precio: menor a mayor</option>
-              <option value="price-high">Precio: mayor a menor</option>
-              <option value="rating">Mejor calificados</option>
-            </select>
-          </div>
+          <p v-if="companiesList.length === 0" class="empty-catalog-msg">Aún no hay productos publicados.</p>
         </div>
 
-        <div class="products-grid">
-          <div
-            v-for="product in sortedAndFilteredProducts"
-            :key="product.id"
-            class="product-card"
-            @click="showProductDetail(product)"
-          >
-            <div class="product-image">
-              <img :src="product.image" :alt="product.title" @error="handleImageError" />
+        <!-- ── Paso 2: catálogo de la empresa seleccionada ── -->
+        <template v-else>
+          <div class="catalog-search-bar">
+            <button class="btn btn-outline btn-sm back-to-companies-btn" @click="backToCompanies">
+              <i class="fas fa-arrow-left"></i> Todas las empresas
+            </button>
+            <div class="search-wrap">
+              <i class="fas fa-search"></i>
+              <input v-model="searchQuery" type="text" placeholder="Buscar productos…" />
             </div>
-            <div class="product-info">
-              <div class="product-title">{{ product.title }}</div>
-              <div class="product-price">${{ product.price.toFixed(2) }}</div>
-              <div class="product-seller">{{ product.seller || 'Unify' }}</div>
-              <div class="product-rating">
-                <span v-for="n in 5" :key="n" :class="{ 'star-filled': n <= Math.round(product.rating || 0) }">★</span>
-                <span class="rating-count">({{ product.reviews || 0 }})</span>
-              </div>
-              <button class="btn-add" @click.stop="addToCart(product)">
-                <i class="fas fa-shopping-cart"></i> Agregar al carrito
-              </button>
+            <div class="catalog-filters">
+              <select v-model="selectedCategory" class="sel">
+                <option value="Todos">Todas las categorías</option>
+                <option v-for="cat in categories" :key="cat" :value="cat">{{ cat }}</option>
+              </select>
+              <select v-model="sortOption" class="sel">
+                <option value="recent">Más recientes</option>
+                <option value="price-low">Precio: menor a mayor</option>
+                <option value="price-high">Precio: mayor a menor</option>
+                <option value="rating">Mejor calificados</option>
+              </select>
             </div>
           </div>
-        </div>
+
+          <div class="products-grid">
+            <div
+              v-for="product in sortedAndFilteredProducts"
+              :key="product.id"
+              class="product-card"
+              @click="showProductDetail(product)"
+            >
+              <div class="product-image">
+                <img :src="product.image" :alt="product.title" @error="handleImageError" />
+              </div>
+              <div class="product-info">
+                <div class="product-title">{{ product.title }}</div>
+                <div class="product-price">${{ product.price.toFixed(2) }}</div>
+                <div class="product-seller">{{ product.seller || 'Unify' }}</div>
+                <div class="product-rating">
+                  <span v-for="n in 5" :key="n" :class="{ 'star-filled': n <= Math.round(product.rating || 0) }">★</span>
+                  <span class="rating-count">({{ product.reviews || 0 }})</span>
+                </div>
+                <button class="btn-add" @click.stop="addToCart(product)">
+                  <i class="fas fa-shopping-cart"></i> Agregar al carrito
+                </button>
+              </div>
+            </div>
+          </div>
+        </template>
       </template>
 
       <!-- ════════════════════════════════════════
@@ -271,7 +296,16 @@
       ════════════════════════════════════════ -->
       <template v-if="currentView === 'profile'">
         <div class="profile-card">
-          <div class="profile-avatar">{{ userInitials }}</div>
+          <div class="profile-avatar-wrap">
+            <div class="profile-avatar" :class="{ 'has-photo': avatarUrl }">
+              <img v-if="avatarUrl" :src="avatarUrl" alt="Foto de perfil" />
+              <span v-else>{{ userInitials }}</span>
+            </div>
+            <label class="avatar-edit-btn" :class="{ uploading: avatarUploading }">
+              <i class="fas" :class="avatarUploading ? 'fa-spinner fa-spin' : 'fa-camera'"></i>
+              <input type="file" accept="image/*" @change="uploadAvatar" hidden />
+            </label>
+          </div>
           <h3>{{ userName }}</h3>
           <p class="profile-email">{{ userEmail }}</p>
           <p class="profile-role">Rol: {{ userRole }}</p>
@@ -332,7 +366,28 @@
           <button class="modal-close" @click="closeProductDetail">&times;</button>
           <div class="detail-layout">
             <div class="detail-image">
-              <img :src="selectedProduct.image" :alt="selectedProduct.title" @error="handleImageError" />
+              <img
+                :src="(selectedProduct.images && selectedProduct.images.length) ? selectedProduct.images[detailImageIndex] : selectedProduct.image"
+                :alt="selectedProduct.title"
+                @error="handleImageError"
+              />
+              <template v-if="selectedProduct.images && selectedProduct.images.length > 1">
+                <button class="carousel-arrow carousel-arrow-left" @click.stop="prevDetailImage" aria-label="Imagen anterior">
+                  <i class="fas fa-chevron-left"></i>
+                </button>
+                <button class="carousel-arrow carousel-arrow-right" @click.stop="nextDetailImage" aria-label="Imagen siguiente">
+                  <i class="fas fa-chevron-right"></i>
+                </button>
+                <div class="carousel-dots">
+                  <span
+                    v-for="(img, i) in selectedProduct.images"
+                    :key="i"
+                    class="carousel-dot"
+                    :class="{ active: i === detailImageIndex }"
+                    @click.stop="setDetailImage(i)"
+                  ></span>
+                </div>
+              </template>
             </div>
             <div class="detail-info">
               <h2>{{ selectedProduct.title }}</h2>
@@ -497,6 +552,8 @@ export default {
     return {
       // ─── Usuario ──────────────────────────────
       userName: 'Cliente',
+      avatarUrl: null,
+      avatarUploading: false,
       userEmail: 'cliente@email.com',
       userRole: 'Cliente',
       userPoints: 0,
@@ -509,6 +566,7 @@ export default {
       // ─── Productos y filtros ────────────────
       products: [],
       selectedCategory: 'Todos',
+      selectedCompanyId: null, // null = mostrando lista de empresas; con valor = viendo productos de esa empresa
       categories: ['Todos', 'Electrónica', 'Hogar', 'Moda', 'Ofertas', 'Alimentos', 'Salud & Belleza', 'Deportes', 'Juguetes', 'Herramientas'],
       searchQuery: '',
       sortOption: 'recent',
@@ -554,6 +612,10 @@ export default {
 
       // ─── Modal detalle producto ──────────────
       selectedProduct: null,
+      detailImageIndex: 0,
+
+      // ─── Fotos de perfil de empresas (company_profiles) ─
+      companyLogos: {}, // { [sellerId]: logo_url }
 
       // ─── Modal pago ──────────────────────────
       showCheckoutModal: false,
@@ -596,12 +658,33 @@ export default {
     userInitials() {
       return this.userName.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2)
     },
+    // ─── Catálogo agrupado por empresa ───
+    companiesList() {
+      const groups = {}
+      this.products.forEach((p) => {
+        const key = p.sellerId || 'sin-empresa'
+        if (!groups[key]) {
+          groups[key] = {
+            id: p.sellerId,
+            name: p.seller || 'Unify',
+            count: 0,
+            // Prioridad: foto de perfil actual de la empresa > snapshot guardado en el producto > imagen del producto (último recurso)
+            image: this.companyLogos[p.sellerId] || p.sellerLogoUrl || p.image,
+          }
+        }
+        groups[key].count += 1
+      })
+      return Object.values(groups).sort((a, b) => a.name.localeCompare(b.name))
+    },
     filteredProducts() {
       if (this.selectedCategory === 'Todos') return this.products
       return this.products.filter(p => p.category === this.selectedCategory)
     },
     sortedAndFilteredProducts() {
       let result = [...this.products]
+      if (this.selectedCompanyId) {
+        result = result.filter(p => p.sellerId === this.selectedCompanyId)
+      }
       if (this.selectedCategory !== 'Todos') {
         result = result.filter(p => p.category === this.selectedCategory)
       }
@@ -706,13 +789,71 @@ export default {
         this.currentUserId = user.id || null
 
         if (this.currentUserId) {
-          const profileRes = await insforge.database.from('profiles').select('points').eq('id', this.currentUserId).single()
-          if (!profileRes?.error && typeof profileRes?.data?.points === 'number') {
-            this.userPoints = profileRes.data.points
+          const profileRes = await insforge.database.from('profiles').select('points, avatar_url').eq('id', this.currentUserId).single()
+          if (!profileRes?.error) {
+            if (typeof profileRes?.data?.points === 'number') this.userPoints = profileRes.data.points
+            if (profileRes?.data?.avatar_url) this.avatarUrl = profileRes.data.avatar_url
           }
         }
       } catch (err) {
         console.warn('Error cargando perfil de cliente:', err)
+      }
+    },
+
+    // ─── Foto de perfil (InsForge Storage) ───────
+    async uploadAvatar(event) {
+      const file = event.target.files && event.target.files[0]
+      event.target.value = '' // permite volver a elegir el mismo archivo después
+      if (!file) return
+
+      if (!file.type.startsWith('image/')) {
+        alert('Por favor selecciona un archivo de imagen.')
+        return
+      }
+      if (file.size > 3 * 1024 * 1024) {
+        alert('La imagen debe pesar menos de 3MB.')
+        return
+      }
+      if (!this.currentUserId) {
+        alert('Inicia sesión de nuevo para poder actualizar tu foto.')
+        return
+      }
+
+      this.avatarUploading = true
+      try {
+        const ext = file.name.split('.').pop()
+        const key = `clients/${this.currentUserId}.${ext}`
+
+        const { data: uploadData, error: uploadError } = await insforge.storage
+          .from('avatars')
+          .upload(key, file)
+
+        if (uploadError) {
+          alert('No se pudo subir la imagen: ' + (uploadError.message || 'error desconocido'))
+          return
+        }
+
+        // La bucket "avatars" debe ser pública; el SDK devuelve una ruta relativa (data.url).
+        // Si en tu proyecto ya viene como URL completa, esto lo detecta y no la duplica.
+        const rawUrl = uploadData?.url || ''
+        const fullUrl = rawUrl.startsWith('http') ? rawUrl : `${insforge.baseUrl || ''}${rawUrl}`
+
+        const { error: dbError } = await insforge.database
+          .from('profiles')
+          .update({ avatar_url: fullUrl })
+          .eq('id', this.currentUserId)
+
+        if (dbError) {
+          alert('La imagen se subió, pero no se pudo guardar en tu perfil: ' + (dbError.message || ''))
+          return
+        }
+
+        this.avatarUrl = fullUrl
+      } catch (err) {
+        console.error('Error subiendo la foto de perfil:', err)
+        alert('Ocurrió un error inesperado subiendo la foto.')
+      } finally {
+        this.avatarUploading = false
       }
     },
 
@@ -800,6 +941,16 @@ export default {
       }
     },
 
+    // ─── Catálogo agrupado por empresa ───
+    selectCompany(companyId) {
+      this.selectedCompanyId = companyId
+      this.selectedCategory = 'Todos'
+      this.searchQuery = ''
+    },
+    backToCompanies() {
+      this.selectedCompanyId = null
+    },
+
     // ─── Productos (InsForge) ──────────────────
     async loadProducts() {
       try {
@@ -821,14 +972,17 @@ export default {
           category: p.category,
           seller: p.seller_name || 'Unify',
           sellerId: p.seller_id || null,
+          sellerLogoUrl: p.seller_logo_url || null,
           rating: 0,
           reviews: 0,
           image: p.image,
+          images: (Array.isArray(p.images) && p.images.length > 0) ? p.images : (p.image ? [p.image] : []),
           description: p.description,
           stock: p.stock,
         }))
 
         this.loadRealRatingsForProducts()
+        this.loadCompanyLogos()
       } catch (err) {
         console.warn('Error inesperado cargando productos:', err)
       }
@@ -861,6 +1015,26 @@ export default {
         })
       } catch (err) {
         console.warn('Error inesperado cargando calificaciones:', err)
+      }
+    },
+
+    // Trae la foto de perfil ACTUAL de cada empresa desde company_profiles,
+    // para que la tarjeta de empresa nunca muestre la foto de un producto.
+    async loadCompanyLogos() {
+      try {
+        const { data, error } = await insforge.database
+          .from('company_profiles')
+          .select('id,logo_url')
+
+        if (error || !data) return
+
+        const map = {}
+        data.forEach((c) => {
+          if (c.id && c.logo_url) map[c.id] = c.logo_url
+        })
+        this.companyLogos = map
+      } catch (err) {
+        console.warn('Error inesperado cargando fotos de empresas:', err)
       }
     },
 
@@ -996,14 +1170,30 @@ export default {
     // ─── Modal detalle producto ────────────────
     showProductDetail(product) {
       this.selectedProduct = product
+      this.detailImageIndex = 0
       this.loadMyReviewForProduct(product.id)
     },
     closeProductDetail() {
       this.selectedProduct = null
+      this.detailImageIndex = 0
       this.myRatingStars = 0
       this.myRatingHover = 0
       this.myRatingComment = ''
       this.hasExistingRating = false
+    },
+    // ─── Carrusel de imágenes del producto ─────
+    prevDetailImage() {
+      if (!this.selectedProduct?.images?.length) return
+      const total = this.selectedProduct.images.length
+      this.detailImageIndex = (this.detailImageIndex - 1 + total) % total
+    },
+    nextDetailImage() {
+      if (!this.selectedProduct?.images?.length) return
+      const total = this.selectedProduct.images.length
+      this.detailImageIndex = (this.detailImageIndex + 1) % total
+    },
+    setDetailImage(i) {
+      this.detailImageIndex = i
     },
 
     // ─── Calificación de productos (reviews reales) ─
@@ -1678,6 +1868,64 @@ header img {
   cursor: pointer;
 }
 
+/* ── Catálogo por empresa ─────────────────────── */
+.companies-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 1.5rem;
+  margin-bottom: 2rem;
+}
+.company-card {
+  background: white;
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  border: 1px solid var(--border);
+  transition: all 0.3s;
+  cursor: pointer;
+}
+.company-card:hover {
+  transform: translateY(-5px);
+  box-shadow: var(--shadow-md);
+}
+.company-card-image {
+  height: 140px;
+  background: var(--bg-light);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+.company-card-image img {
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  object-fit: cover;
+  display: block;
+}
+.company-card-info {
+  padding: 1rem;
+  text-align: center;
+}
+.company-card-name {
+  font-weight: 600;
+  font-size: 1rem;
+  margin-bottom: 0.3rem;
+}
+.company-card-count {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+.empty-catalog-msg {
+  color: var(--text-muted);
+  text-align: center;
+  grid-column: 1 / -1;
+  padding: 2rem 0;
+}
+.back-to-companies-btn {
+  white-space: nowrap;
+}
+
 /* ── Productos ────────────────────────────────── */
 .products-grid {
   display: grid;
@@ -1708,7 +1956,10 @@ header img {
 .product-image img {
   width: 100%;
   height: 100%;
+  min-width: 0;
+  min-height: 0;
   object-fit: cover;
+  display: block;
 }
 .product-info {
   padding: 1rem;
@@ -1960,6 +2211,11 @@ header img {
   max-width: 400px;
   margin: 0 auto;
 }
+.profile-avatar-wrap {
+  position: relative;
+  width: 80px;
+  margin: 0 auto 1rem;
+}
 .profile-avatar {
   width: 80px;
   height: 80px;
@@ -1971,7 +2227,41 @@ header img {
   display: flex;
   align-items: center;
   justify-content: center;
-  margin: 0 auto 1rem;
+  overflow: hidden;
+}
+.profile-avatar.has-photo {
+  background: var(--bg-light);
+}
+.profile-avatar img {
+  width: 80px;
+  height: 80px;
+  min-width: 80px;
+  min-height: 80px;
+  max-width: 80px;
+  max-height: 80px;
+  object-fit: cover;
+  display: block;
+}
+.avatar-edit-btn {
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: var(--sky-600);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.8rem;
+  cursor: pointer;
+  border: 2px solid white;
+  box-shadow: var(--shadow-sm, 0 2px 6px rgba(0,0,0,0.15));
+}
+.avatar-edit-btn.uploading {
+  pointer-events: none;
+  opacity: 0.7;
 }
 .profile-email {
   color: var(--text-muted);
@@ -2043,11 +2333,61 @@ header img {
   gap: 2rem;
   margin-top: 0.5rem;
 }
+.detail-image {
+  position: relative;
+}
 .detail-image img {
   width: 100%;
   height: auto;
   border-radius: var(--radius-md);
   object-fit: cover;
+}
+.carousel-arrow {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(255, 255, 255, 0.9);
+  color: var(--text-dark);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s;
+}
+.carousel-arrow:hover {
+  background: white;
+}
+.carousel-arrow-left {
+  left: 10px;
+}
+.carousel-arrow-right {
+  right: 10px;
+}
+.carousel-dots {
+  position: absolute;
+  bottom: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 6px;
+}
+.carousel-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.6);
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.carousel-dot.active {
+  background: var(--green-400);
+  border-color: var(--green-400);
 }
 .detail-info h2 {
   margin-top: 0;

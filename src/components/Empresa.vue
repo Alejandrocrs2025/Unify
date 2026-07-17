@@ -74,8 +74,9 @@
 
         <!-- Perfil empresa -->
         <div class="profile-menu" @click="toggleProfileMenu">
-          <div class="avatar-circle">
-            <span>{{ companyInitials }}</span>
+          <div class="avatar-circle" :class="{ 'has-photo': companyLogoUrl }">
+            <img v-if="companyLogoUrl" :src="companyLogoUrl" alt="Logo" />
+            <span v-else>{{ companyInitials }}</span>
           </div>
           <span class="profile-name">{{ companyName }}</span>
           <i class="fas fa-chevron-down" :class="{ rotated: profileMenuOpen }"></i>
@@ -84,7 +85,10 @@
         <!-- Dropdown perfil -->
         <div class="profile-dropdown" v-if="profileMenuOpen">
           <div class="dropdown-header">
-            <div class="dropdown-avatar">{{ companyInitials }}</div>
+            <div class="dropdown-avatar" :class="{ 'has-photo': companyLogoUrl }">
+              <img v-if="companyLogoUrl" :src="companyLogoUrl" alt="Logo" />
+              <span v-else>{{ companyInitials }}</span>
+            </div>
             <div>
               <div class="dropdown-name">{{ companyName }}</div>
               <div class="dropdown-email">{{ companyEmail }}</div>
@@ -1176,6 +1180,28 @@
         </div>
       </template>
 
+      <!-- ════════════════════════════════════════
+           VISTA: CONFIGURACIÓN
+      ════════════════════════════════════════ -->
+      <template v-if="currentView === 'settings'">
+        <div class="settings-card">
+          <h3>Foto de la empresa</h3>
+          <p class="settings-hint">Este logo se muestra a los clientes en el catálogo, para que identifiquen tu empresa fácilmente.</p>
+          <div class="settings-logo-wrap">
+            <div class="settings-logo" :class="{ 'has-photo': companyLogoUrl }">
+              <img v-if="companyLogoUrl" :src="companyLogoUrl" alt="Logo de la empresa" />
+              <span v-else>{{ companyInitials }}</span>
+            </div>
+            <label class="avatar-edit-btn" :class="{ uploading: logoUploading }">
+              <i class="fas" :class="logoUploading ? 'fa-spinner fa-spin' : 'fa-camera'"></i>
+              <input type="file" accept="image/*" @change="uploadCompanyLogo" hidden />
+            </label>
+          </div>
+          <h4>{{ companyName }}</h4>
+          <p class="settings-email">{{ companyEmail }}</p>
+        </div>
+      </template>
+
     </main>
 
     <footer>
@@ -1184,18 +1210,15 @@
         <span class="footer-version">v2.0</span>
       </div>
     </footer>
-    <ChatbotWidget context="empresa" :user-name="companyName" :context-data="{ currentView }" />
   </div>
 </template>
 
 <script>
 import { insforge } from '../insforgeClient.js'
-import ChatbotWidget from './ChatbotWidget.vue'
 
 export default {
   name: 'EmpresaDashboard',
   emits: ['switch-view'],
-  components: { ChatbotWidget },
 
   data() {
     return {
@@ -1203,6 +1226,8 @@ export default {
       companyName: 'Empresa Demo',
       companyEmail: 'empresa@unify.com',
       companyId: null,
+      companyLogoUrl: null,
+      logoUploading: false,
       currentView: 'dashboard',
       globalSearch: '',
       searchFocused: false,
@@ -1712,13 +1737,71 @@ export default {
 
         // El nombre comercial real se guarda en company_profiles (formulario de detalles de empresa),
         // no en los metadatos del usuario de auth.
-        const companyRes = await insforge.database.from('company_profiles').select('company_name').eq('id', u.id).single()
+        const companyRes = await insforge.database.from('company_profiles').select('company_name, logo_url').eq('id', u.id).single()
         if (!companyRes?.error && companyRes?.data?.company_name) {
           this.companyName = companyRes.data.company_name
         } else {
           this.companyName = u.user_metadata?.full_name || u.email || 'Empresa Demo'
         }
+        if (!companyRes?.error && companyRes?.data?.logo_url) {
+          this.companyLogoUrl = companyRes.data.logo_url
+        }
       } catch (e) { console.warn('Error cargando perfil:', e) }
+    },
+
+    // ─── Logo de la empresa (InsForge Storage) ───
+    async uploadCompanyLogo(event) {
+      const file = event.target.files && event.target.files[0]
+      event.target.value = ''
+      if (!file) return
+
+      if (!file.type.startsWith('image/')) {
+        alert('Por favor selecciona un archivo de imagen.')
+        return
+      }
+      if (file.size > 3 * 1024 * 1024) {
+        alert('La imagen debe pesar menos de 3MB.')
+        return
+      }
+      if (!this.companyId) {
+        alert('Inicia sesión de nuevo para poder actualizar el logo.')
+        return
+      }
+
+      this.logoUploading = true
+      try {
+        const ext = file.name.split('.').pop()
+        const key = `companies/${this.companyId}.${ext}`
+
+        const { data: uploadData, error: uploadError } = await insforge.storage
+          .from('avatars')
+          .upload(key, file)
+
+        if (uploadError) {
+          alert('No se pudo subir el logo: ' + (uploadError.message || 'error desconocido'))
+          return
+        }
+
+        const rawUrl = uploadData?.url || ''
+        const fullUrl = rawUrl.startsWith('http') ? rawUrl : `${insforge.baseUrl || ''}${rawUrl}`
+
+        const { error: dbError } = await insforge.database
+          .from('company_profiles')
+          .update({ logo_url: fullUrl })
+          .eq('id', this.companyId)
+
+        if (dbError) {
+          alert('El logo se subió, pero no se pudo guardar: ' + (dbError.message || ''))
+          return
+        }
+
+        this.companyLogoUrl = fullUrl
+      } catch (err) {
+        console.error('Error subiendo el logo:', err)
+        alert('Ocurrió un error inesperado subiendo el logo.')
+      } finally {
+        this.logoUploading = false
+      }
     },
 
     // ─── Chat real con clientes (InsForge) ───────
@@ -1898,7 +1981,9 @@ export default {
       this.newProduct.description = p.description || ''
       this.newProduct.price = p.price
       this.newProduct.stock = p.stock
-      this.newProduct.previewImages = p.image ? [p.image] : []
+      this.newProduct.previewImages = (Array.isArray(p.images) && p.images.length > 0)
+        ? [...p.images]
+        : (p.image ? [p.image] : [])
     },
     async toggleProductStatus(p) {
       const newStatus = p.status === 'Activo' ? 'Pausado' : 'Activo'
@@ -2093,6 +2178,7 @@ export default {
         const payload = {
           seller_id: userId,
           seller_name: this.companyName,
+          seller_logo_url: this.companyLogoUrl || null,
           title: this.newProduct.title,
           category: this.newProduct.category,
           description: this.newProduct.description,
@@ -2101,6 +2187,7 @@ export default {
           status,
           logistics: this.logisticsOptions.find(o => o.key === this.newProduct.logistics)?.title || '',
           image: this.newProduct.previewImages[0] || '',
+          images: this.newProduct.previewImages,
         }
 
         let error
@@ -2519,6 +2606,18 @@ export default {
   font-weight: 700;
   font-size: 0.75rem;
   flex-shrink: 0;
+  overflow: hidden;
+}
+.avatar-circle.has-photo { background: var(--bg-light); }
+.avatar-circle img {
+  width: 32px;
+  height: 32px;
+  min-width: 32px;
+  min-height: 32px;
+  max-width: 32px;
+  max-height: 32px;
+  object-fit: cover;
+  display: block;
 }
 .profile-name {
   font-weight: 600;
@@ -2567,6 +2666,88 @@ export default {
   font-weight: 700;
   font-size: 0.9rem;
   flex-shrink: 0;
+  overflow: hidden;
+}
+.dropdown-avatar.has-photo { background: var(--bg-light); }
+.dropdown-avatar img {
+  width: 40px;
+  height: 40px;
+  min-width: 40px;
+  min-height: 40px;
+  max-width: 40px;
+  max-height: 40px;
+  object-fit: cover;
+  display: block;
+}
+
+/* ── Configuración (logo de la empresa) ───────── */
+.settings-card {
+  background: white;
+  border-radius: var(--radius-lg);
+  padding: 2rem;
+  text-align: center;
+  border: 1px solid var(--border);
+  max-width: 420px;
+  margin: 0 auto;
+}
+.settings-hint {
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  margin-bottom: 1.5rem;
+}
+.settings-logo-wrap {
+  position: relative;
+  width: 100px;
+  margin: 0 auto 1rem;
+}
+.settings-logo {
+  width: 100px;
+  height: 100px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--sky-600), var(--sky-400));
+  color: white;
+  font-size: 2.2rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+.settings-logo.has-photo { background: var(--bg-light); }
+.settings-logo img {
+  width: 100px;
+  height: 100px;
+  min-width: 100px;
+  min-height: 100px;
+  max-width: 100px;
+  max-height: 100px;
+  object-fit: cover;
+  display: block;
+}
+.settings-email {
+  color: var(--text-muted);
+  font-size: 0.85rem;
+}
+.avatar-edit-btn {
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--sky-600);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.85rem;
+  cursor: pointer;
+  border: 2px solid white;
+  box-shadow: var(--shadow-md);
+}
+.avatar-edit-btn.uploading {
+  pointer-events: none;
+  opacity: 0.7;
 }
 .dropdown-name {
   font-weight: 700;

@@ -9,7 +9,7 @@
       @click="toggleChat"
       :aria-label="isOpen ? 'Cerrar asistente' : 'Abrir asistente Unify'"
     >
-      <i v-if="!isOpen" class="fas fa-comment-dots"></i>
+      <img v-if="!isOpen" src="/public/img/paco.png" alt="Paco" class="ubot-fab-avatar" />
       <i v-else class="fas fa-times"></i>
       <span v-if="hasUnread && !isOpen" class="ubot-fab-dot"></span>
     </button>
@@ -21,7 +21,7 @@
       <div v-if="isOpen" class="ubot-panel">
         <div class="ubot-header">
           <div class="ubot-header-info">
-            <div class="ubot-avatar"></div>
+            <div class="ubot-avatar"><img src="/public/img/paco.png" alt="Paco" /></div>
             <div>
               <h4>{{ contextConfig.title }}</h4>
               <span class="ubot-status"><span class="ubot-dot"></span> En línea</span>
@@ -239,20 +239,19 @@ Responde de forma breve, concreta y accionable.`,
         ...conversation.map((m) => ({ role: m.role, content: m.content })),
       ]
 
-      // Opción recomendada: usar el módulo de IA integrado de InsForge.
-      // El backend de InsForge gestiona la clave de OpenRouter por ti,
-      // así que no expones ningún API key en el frontend.
-      const { data, error } = await insforge.ai.chat({
-        model: 'anthropic/claude-3.5-haiku', // ajusta al modelo habilitado en tu proyecto InsForge
+      // Opción recomendada: usar el proxy de IA integrado de InsForge
+      // (insforge.ai.chat.completions.create), que llama a OpenRouter
+      // por detrás sin exponer ninguna API key en el frontend.
+      // Nota: este método imita el SDK de OpenAI, así que devuelve el
+      // objeto de respuesta directamente (no un patrón { data, error }
+      // como el resto del SDK de InsForge). Si algo falla, lanza una
+      // excepción que ya captura el try/catch de sendMessage().
+      const completion = await insforge.ai.chat.completions.create({
+        model: 'openai/gpt-4o-mini', // cambiado desde anthropic/claude-3.5-haiku: esa ruta devolvía 404 "No endpoints found" en tu clave de OpenRouter
         messages: chatMessages,
       })
 
-      if (error) throw new Error(error.message || 'Error de IA')
-
-      // Ajusta esta línea según la forma exacta de la respuesta que te
-      // devuelva tu versión del SDK (puede venir en data.response,
-      // data.choices[0].message.content, etc. — revísalo en consola una vez).
-      return data?.response || data?.choices?.[0]?.message?.content || 'No obtuve respuesta, intenta de nuevo.'
+      return completion?.choices?.[0]?.message?.content || completion?.response || 'No obtuve respuesta, intenta de nuevo.'
     },
   },
 }
@@ -282,6 +281,7 @@ Responde de forma breve, concreta y accionable.`,
   justify-content: center;
   box-shadow: var(--shadow-md, 0 8px 32px rgba(0, 94, 89, 0.25));
   position: relative;
+  overflow: hidden;
   transition: transform 0.2s ease;
 }
 .ubot-fab:hover {
@@ -289,6 +289,11 @@ Responde de forma breve, concreta y accionable.`,
 }
 .ubot-fab-open {
   background: var(--text-dark, #0d1f1e);
+}
+.ubot-fab-avatar {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 .ubot-fab-dot {
   position: absolute;
@@ -299,6 +304,7 @@ Responde de forma breve, concreta y accionable.`,
   border-radius: 50%;
   background: #ff5252;
   border: 2px solid white;
+  z-index: 1;
 }
 
 /* ── Panel ────────────────────────────────────── */
@@ -351,6 +357,13 @@ Responde de forma breve, concreta y accionable.`,
   align-items: center;
   justify-content: center;
   font-size: 1.1rem;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+.ubot-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 .ubot-header h4 {
   margin: 0;
