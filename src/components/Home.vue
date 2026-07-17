@@ -48,7 +48,7 @@
           <div class="avatars">
             <img src="https://pbs.twimg.com/profile_images/1273327825471320069/CIavLpX4.png" alt="" />
             <img src="https://pedroroque.net/wp-content/uploads/2020/03/pan-sinai-300x300.png" alt="" />
-            <img src="https://scontent-hou1-1.cdninstagram.com/v/t51.82787-19/696704437_18360779311300058_243767840732834882_n.jpg?stp=dst-jpg_s150x150_tt6&efg=eyJ2ZW5jb2RlX3RhZyI6InByb2ZpbGVfcGljLmRqYW5nby41OTEuYzIifQ&_nc_ht=scontent-hou1-1.cdninstagram.com&_nc_cat=102&_nc_oc=Q6cZ2gGQyrtr42ODeAa0gBM09JfvHAh7N8ynd6ASzXBIoHq-DpL_hpipDar3acg_pcTfiME&_nc_ohc=XGs4KoaKf7YQ7kNvwF6GWdG&_nc_gid=ejRlg-PlKuHzvPUKygIGHg&edm=AOQ1c0wBAAAA&ccb=7-5&oh=00_AQBWQJd30GX9mVNWUut0XlwehggKSWdpHqPD1T2xQNLy3A&oe=6A5F0233&_nc_sid=8b3546" alt="" />
+            <img src="https://tse4.mm.bing.net/th/id/OIP.FbU5gcBFq3Md3qLZAKxzWQHaHa?r=0&rs=1&pid=ImgDetMain&o=7&rm=3" alt="" />
           </div>
           <p class="proof-text"><strong>+180 empresas</strong><br />optimizan su distribución con Unify</p>
         </div>

@@ -564,6 +564,8 @@ export default {
       chatInputMsg: '',
       driverTyping: false,
       chatMessages: {}, // key: orderId, value: array de mensajes
+      orderChatPollInterval: null,
+      driverLocationPollInterval: null,
       mapUpdateSeconds: 0,
       driverRealPosition: null, // { lat, lng } — viene de InsForge Realtime
       leafletMap: null,
@@ -676,8 +678,6 @@ export default {
     setInterval(() => {
       this.mapUpdateSeconds = (this.mapUpdateSeconds % 999) + 1
     }, 1000)
-    // Inicializar chats para pedidos con conductor
-    this.initChatsForOrders()
     // Conectar a InsForge Realtime para recibir la ubicación del repartidor
     this.connectRealtime()
   },
@@ -685,6 +685,8 @@ export default {
   beforeUnmount() {
     this.disconnectRealtime()
     if (this.companyChatPollInterval) clearInterval(this.companyChatPollInterval)
+    if (this.orderChatPollInterval) clearInterval(this.orderChatPollInterval)
+    if (this.driverLocationPollInterval) clearInterval(this.driverLocationPollInterval)
   },
 
   methods: {
@@ -1118,7 +1120,6 @@ export default {
       newOrder.driverName = randomDriver.name
 
       this.orders.unshift(newOrder)
-      this.initChatForOrder(newOrder.id, randomDriver.name)
 
       // ─ Actualizar puntos reales en InsForge (ganar - canjeados) ─
       if (this.currentUserId) {
@@ -1224,10 +1225,22 @@ export default {
         order.driverName = randomDriver.name
       }
 
-      // Inicializar chat si no existe
-      if (!this.chatMessages[orderId]) {
-        this.initChatForOrder(orderId, order.driverName)
-      }
+      // Cargar el chat real de este pedido (mensajes guardados en InsForge)
+      // y empezar a refrescarlo periódicamente mientras la vista de tracking esté abierta.
+      this.loadOrderChatMessages(orderId)
+      if (this.orderChatPollInterval) clearInterval(this.orderChatPollInterval)
+      this.orderChatPollInterval = setInterval(() => {
+        this.loadOrderChatMessages(this.trackingOrderId)
+      }, 4000)
+
+      // Consultar la ubicación real del repartidor cada pocos segundos.
+      // (Más confiable que depender de un push de Realtime cuya sintaxis
+      // exacta no pudimos confirmar contra tu versión del SDK.)
+      this.loadDriverLocation(this.trackingToken)
+      if (this.driverLocationPollInterval) clearInterval(this.driverLocationPollInterval)
+      this.driverLocationPollInterval = setInterval(() => {
+        this.loadDriverLocation(this.trackingToken)
+      }, 3000)
 
       // Suscribirse al canal de este pedido para recibir su ubicación en vivo
       this.subscribeToOrderChannel(this.trackingToken)
@@ -1235,6 +1248,31 @@ export default {
       this.$nextTick(() => {
         this.initLeafletMap()
       })
+    },
+
+    // ─── Ubicación real del repartidor (consultando driver_locations) ───
+    async loadDriverLocation(token) {
+      if (!token) return
+      try {
+        const { data, error } = await insforge.database
+          .from('driver_locations')
+          .select('*')
+          .eq('order_id', token)
+          .order('created_at', { ascending: false })
+
+        if (error) {
+          console.warn('No se pudo consultar la ubicación del repartidor:', error)
+          return
+        }
+        const latest = data && data.length > 0 ? data[0] : null
+        if (latest && typeof latest.lat === 'number' && typeof latest.lng === 'number') {
+          this.driverRealPosition = { lat: latest.lat, lng: latest.lng }
+          this.mapUpdateSeconds = 0
+          this.updateDriverMarker()
+        }
+      } catch (err) {
+        console.warn('Error inesperado consultando la ubicación del repartidor:', err)
+      }
     },
 
     // ─── Realtime (InsForge) — ubicación del repartidor ──
@@ -1323,78 +1361,65 @@ export default {
       this.leafletMap.panTo([lat, lng])
     },
 
-    initChatsForOrders() {
-      this.orders.forEach(order => {
-        if (order.driverName && !this.chatMessages[order.id]) {
-          this.initChatForOrder(order.id, order.driverName)
-        }
-      })
-    },
+    // ─── Chat real con el repartidor (tabla 'messages', filtrado por order_id) ───
+    async loadOrderChatMessages(orderId) {
+      if (!orderId) return
+      try {
+        const { data, error } = await insforge.database
+          .from('messages')
+          .select('*')
+          .eq('order_id', orderId)
+          .order('created_at', { ascending: true })
 
-    initChatForOrder(orderId, driverName) {
-      if (!this.chatMessages[orderId]) {
-        this.chatMessages = {
-          ...this.chatMessages,
-          [orderId]: [
-            { from: 'driver', text: `Hola, soy ${driverName}, tu repartidor. Pronto entregaré tu pedido.`, time: '10:00' },
-            { from: 'cliente', text: '¡Gracias! Estaré atento.', time: '10:02' }
-          ]
+        if (error) {
+          console.warn('No se pudieron cargar los mensajes del pedido:', error)
+          return
         }
+
+        const mapped = (data || []).map((m) => ({
+          from: m.sender_role === 'cliente' ? 'cliente' : 'driver',
+          text: m.text,
+          time: m.created_at
+            ? new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+            : '',
+        }))
+
+        this.chatMessages = { ...this.chatMessages, [orderId]: mapped }
+        this.$nextTick(() => this.scrollChatToBottom())
+      } catch (err) {
+        console.warn('Error inesperado cargando el chat del pedido:', err)
       }
     },
 
-    sendChatMessage() {
-      console.log('sendChatMessage llamado', {
-        msg: this.chatInputMsg,
-        trackingOrderId: this.trackingOrderId,
-        chatMessages: this.chatMessages
-      })
-
+    async sendChatMessage() {
       const msg = this.chatInputMsg.trim()
-      if (!msg) {
-        console.warn('Mensaje vacío')
-        return
-      }
+      if (!msg) return
       if (!this.trackingOrderId) {
-        console.warn('trackingOrderId es nulo')
         alert('No hay pedido en seguimiento. Por favor, selecciona un pedido.')
         return
       }
 
       const orderId = this.trackingOrderId
-      const now = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
 
-      // Asegurar que el array de mensajes existe
-      if (!this.chatMessages[orderId]) {
-        this.chatMessages = { ...this.chatMessages, [orderId]: [] }
-      }
-
-      // Agregar mensaje del cliente
-      const newMessage = { from: 'cliente', text: msg, time: now }
-      const currentMessages = this.chatMessages[orderId]
-      this.chatMessages = { ...this.chatMessages, [orderId]: [...currentMessages, newMessage] }
-
-      // Limpiar input
       this.chatInputMsg = ''
-      this.scrollChatToBottom()
+      try {
+        const { error } = await insforge.database.from('messages').insert([{
+          order_id: orderId,
+          client_id: this.currentUserId,
+          client_name: this.userName,
+          sender_role: 'cliente',
+          text: msg,
+        }])
 
-      // Simular respuesta del driver
-      this.driverTyping = true
-      setTimeout(() => {
-        this.driverTyping = false
-        const replies = [
-          'Recibido, estoy en camino 🚚',
-          'Llego en aproximadamente 15 minutos.',
-          'Ok, cualquier novedad te aviso.',
-          'Confirmado, tu pedido está en ruta.'
-        ]
-        const reply = replies[Math.floor(Math.random() * replies.length)]
-        const driverName = this.trackingDriver ? this.trackingDriver.name : 'Repartidor'
-        const driverReply = { from: 'driver', text: reply, time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) }
-        const updatedMessages = [...this.chatMessages[orderId], driverReply]
-        this.chatMessages = { ...this.chatMessages, [orderId]: updatedMessages }
-        this.scrollChatToBottom()
-      }, 1500)
+        if (error) {
+          alert('No se pudo enviar el mensaje: ' + (error.message || 'error desconocido'))
+          return
+        }
+        await this.loadOrderChatMessages(orderId)
+      } catch (err) {
+        console.warn('Error inesperado enviando el mensaje:', err)
+        alert('Error inesperado enviando el mensaje.')
+      }
     },
 
     scrollChatToBottom() {
