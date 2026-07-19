@@ -223,16 +223,6 @@
               <p><strong>Total:</strong> ${{ trackingOrder.total.toFixed(2) }}</p>
               <p><strong>Estado:</strong> <span :class="getStatusClass(trackingOrder.status)">{{ trackingOrder.status }}</span></p>
               <p><strong>Repartidor:</strong> {{ trackingDriver ? trackingDriver.name : 'Asignando...' }}</p>
-
-              <div class="driver-share-link">
-                <p class="share-link-label">Link para que el repartidor comparta su ubicación:</p>
-                <div class="share-link-row">
-                  <input type="text" readonly :value="trackingLink" @click="$event.target.select()" />
-                  <button class="btn btn-outline btn-sm" @click="copyTrackingLink">
-                    <i class="fas fa-copy"></i> Copiar
-                  </button>
-                </div>
-              </div>
             </div>
 
             <!-- Chat con el repartidor -->
@@ -505,6 +495,9 @@
             <div class="payment-method" @click="selectPaymentMethod('transfer')" :class="{ active: selectedPayment === 'transfer' }">
               <i class="fas fa-university"></i> Transferencia bancaria
             </div>
+            <div class="payment-method" @click="selectPaymentMethod('cash')" :class="{ active: selectedPayment === 'cash' }">
+              <i class="fas fa-money-bill-wave"></i> Efectivo contra entrega
+            </div>
           </div>
           <div class="payment-form" v-if="selectedPayment === 'card'">
             <input type="text" placeholder="Número de tarjeta" class="form-input" />
@@ -520,9 +513,55 @@
             <p>Realiza la transferencia a la cuenta: <strong>Unify Bank - ES91 2100 0418 4502 0005 1332</strong></p>
             <p>Referencia: <strong>#{{ generateOrderRef() }}</strong></p>
           </div>
+          <div class="payment-form" v-if="selectedPayment === 'cash'">
+            <p>Pagarás en efectivo directamente al repartidor cuando recibas tu pedido.</p>
+            <p>Ten el monto exacto listo: <strong>${{ finalCheckoutTotal.toFixed(2) }}</strong></p>
+          </div>
           <button class="btn-primary" style="width: 100%; margin-top: 1rem;" @click="confirmPayment" :disabled="!selectedPayment">
             Confirmar pago
           </button>
+        </div>
+      </div>
+
+      <!-- Modal: Ver detalle de pedido -->
+      <div class="modal-overlay" v-if="showOrderDetailModal" @click.self="closeOrderDetail">
+        <div class="modal-content order-detail-modal">
+          <button class="modal-close" @click="closeOrderDetail">&times;</button>
+          <h2><i class="fas fa-receipt"></i> Detalle del pedido {{ orderDetailMeta.id }}</h2>
+
+          <div v-if="orderDetailLoading" style="text-align:center; padding: 2rem; color: var(--text-muted);">
+            <i class="fas fa-spinner fa-spin" style="font-size: 1.6rem;"></i>
+            <p style="margin-top: 0.6rem;">Cargando detalle del pedido...</p>
+          </div>
+
+          <template v-else>
+            <div class="order-detail-summary">
+              <p><strong>Fecha:</strong> {{ orderDetailMeta.date }}</p>
+              <p><strong>Estado:</strong> <span :class="getStatusClass(orderDetailMeta.status)">{{ orderDetailMeta.status }}</span></p>
+              <p><strong>Forma de pago:</strong> {{ paymentMethodLabel(orderDetailMeta.paymentMethod) }}</p>
+              <p><strong>Total:</strong> ${{ orderDetailMeta.total.toFixed(2) }}</p>
+            </div>
+
+            <div v-if="orderDetailProducts.length" class="order-detail-products">
+              <div v-for="(p, i) in orderDetailProducts" :key="i" class="order-detail-product-row">
+                <img :src="p.image" :alt="p.title" @error="handleImageError" class="order-detail-product-img" />
+                <div class="order-detail-product-info">
+                  <div class="order-detail-product-title">{{ p.title }}</div>
+                  <div class="order-detail-product-company"><i class="fas fa-store"></i> {{ p.companyName || 'Unify' }}</div>
+                  <div class="order-detail-product-meta">
+                    Cantidad: <strong>{{ p.qty }}</strong> · ${{ p.unitPrice.toFixed(2) }} c/u
+                  </div>
+                </div>
+              </div>
+            </div>
+            <p v-else style="text-align:center; color: var(--text-muted); padding: 1.5rem 0;">
+              No se encontró información detallada de los productos de este pedido.
+            </p>
+
+            <button class="btn-primary" style="width: 100%; margin-top: 1rem;" @click="downloadInvoicePdf" :disabled="!orderDetailProducts.length">
+              <i class="fas fa-file-pdf"></i> Imprimir factura
+            </button>
+          </template>
         </div>
       </div>
 
@@ -539,6 +578,7 @@
 import { insforge } from '../insforgeClient.js'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
+import jsPDF from 'jspdf'
 
 // Chatbot 
 import ChatbotWidget from './ChatbotWidget.vue'
@@ -620,6 +660,12 @@ export default {
       // ─── Modal pago ──────────────────────────
       showCheckoutModal: false,
       selectedPayment: null,
+
+      // ─── Modal detalle de pedido / factura ───
+      showOrderDetailModal: false,
+      orderDetailLoading: false,
+      orderDetailProducts: [],
+      orderDetailMeta: { id: '', date: '', status: '', paymentMethod: null, total: 0 },
 
       // ─── Seguimiento (tracking) ──────────────
       trackingOrderId: null,
@@ -744,10 +790,6 @@ export default {
     trackingToken() {
       // El id del pedido puede traer '#', que rompe una URL (se interpreta como fragmento)
       return this.trackingOrderId ? this.trackingOrderId.replace('#', '') : ''
-    },
-    trackingLink() {
-      if (!this.trackingToken) return ''
-      return `${window.location.origin}/repartidor/${encodeURIComponent(this.trackingToken)}`
     },
     driverHasRealLocation() {
       return !!this.driverRealPosition
@@ -1295,7 +1337,8 @@ export default {
       const pointsUsed = this.pointsToRedeem * 100
       const pointsEarned = Math.floor(totalPaid)
 
-      alert(`🎉 ¡Pago exitoso! Has pagado $${totalPaid.toFixed(2)} con ${this.selectedPayment}.`)
+      const paymentLabels = { card: 'tarjeta', paypal: 'PayPal', transfer: 'transferencia bancaria', cash: 'efectivo contra entrega' }
+      alert(`🎉 ¡Pago exitoso! Has pagado $${totalPaid.toFixed(2)} con ${paymentLabels[this.selectedPayment] || this.selectedPayment}.`)
       // Crear nuevo pedido
       const newOrder = {
         id: this.generateOrderRef(),
@@ -1303,7 +1346,8 @@ export default {
         total: totalPaid,
         status: 'En proceso',
         driverId: null,
-        driverName: null
+        driverName: null,
+        paymentMethod: this.selectedPayment
       }
       const randomDriver = this.drivers[Math.floor(Math.random() * this.drivers.length)]
       newOrder.driverId = randomDriver.id
@@ -1327,14 +1371,14 @@ export default {
       }
 
       // ─ Registrar la venta real (para reportes de la empresa) y descontar stock ─
-      await this.registerSaleAndUpdateStock(newOrder.id)
+      await this.registerSaleAndUpdateStock(newOrder.id, this.selectedPayment)
 
       this.pointsToRedeem = 0
       await this.clearCart()
       this.closeCheckoutModal()
     },
 
-    async registerSaleAndUpdateStock(orderRef) {
+    async registerSaleAndUpdateStock(orderRef, paymentMethod) {
       if (this.cart.length === 0) return
 
       // 1) Una fila por UNIDAD vendida (respetando cantidad), para reportes reales
@@ -1346,8 +1390,11 @@ export default {
             product_id: item.id,
             seller_id: item.sellerId,
             product_title: item.title,
+            product_image: item.image,
+            company_name: item.seller,
             category: item.category,
             unit_price: item.price,
+            payment_method: paymentMethod,
             client_id: this.currentUserId,
             client_name: this.userName,
           })
@@ -1381,8 +1428,106 @@ export default {
     },
 
     // ─── Pedidos ─────────────────────────────────
-    viewOrder(orderId) {
-      alert(`📦 Mostrando detalles del pedido ${orderId}`)
+    async viewOrder(orderId) {
+      const order = this.orders.find((o) => o.id === orderId)
+      this.orderDetailMeta = {
+        id: orderId,
+        date: order?.date || '',
+        status: order?.status || '',
+        paymentMethod: order?.paymentMethod || null,
+        total: order?.total || 0,
+      }
+      this.orderDetailProducts = []
+      this.showOrderDetailModal = true
+      this.orderDetailLoading = true
+
+      try {
+        const orderRef = orderId.replace('#', '')
+        const { data, error } = await insforge.database
+          .from('sales')
+          .select('*')
+          .eq('order_ref', orderRef)
+
+        if (error) {
+          console.warn('No se pudo cargar el detalle del pedido:', error)
+          return
+        }
+
+        if (data && data.length > 0) {
+          // Si el pago se hizo desde otra sesión/dispositivo, usamos el método guardado en la venta
+          if (!this.orderDetailMeta.paymentMethod && data[0].payment_method) {
+            this.orderDetailMeta.paymentMethod = data[0].payment_method
+          }
+
+          const grouped = {}
+          data.forEach((row) => {
+            const key = row.product_title
+            if (!grouped[key]) {
+              grouped[key] = {
+                title: row.product_title,
+                image: row.product_image,
+                companyName: row.company_name,
+                unitPrice: row.unit_price || 0,
+                qty: 0,
+              }
+            }
+            grouped[key].qty += 1
+          })
+          this.orderDetailProducts = Object.values(grouped)
+        }
+      } catch (err) {
+        console.warn('Error inesperado cargando el detalle del pedido:', err)
+      } finally {
+        this.orderDetailLoading = false
+      }
+    },
+    closeOrderDetail() {
+      this.showOrderDetailModal = false
+    },
+    paymentMethodLabel(method) {
+      const labels = { card: 'Tarjeta de crédito/débito', paypal: 'PayPal', transfer: 'Transferencia bancaria', cash: 'Efectivo contra entrega' }
+      return labels[method] || 'No especificada'
+    },
+    downloadInvoicePdf() {
+      const doc = new jsPDF()
+      const meta = this.orderDetailMeta
+
+      doc.setFontSize(18)
+      doc.text('Unify - Factura de compra', 14, 20)
+
+      doc.setFontSize(11)
+      doc.text(`Pedido: ${meta.id}`, 14, 32)
+      doc.text(`Fecha: ${meta.date}`, 14, 39)
+      doc.text(`Cliente: ${this.userName || ''}`, 14, 46)
+      doc.text(`Forma de pago: ${this.paymentMethodLabel(meta.paymentMethod)}`, 14, 53)
+      doc.text(`Estado: ${meta.status}`, 14, 60)
+
+      let y = 74
+      doc.setFontSize(12)
+      doc.text('Producto', 14, y)
+      doc.text('Empresa', 90, y)
+      doc.text('Cant.', 145, y)
+      doc.text('Subtotal', 165, y)
+      y += 3
+      doc.line(14, y, 196, y)
+      y += 7
+
+      doc.setFontSize(10)
+      this.orderDetailProducts.forEach((p) => {
+        doc.text(String(p.title).slice(0, 32), 14, y)
+        doc.text(String(p.companyName || 'Unify').slice(0, 22), 90, y)
+        doc.text(String(p.qty), 145, y)
+        doc.text(`$${(p.unitPrice * p.qty).toFixed(2)}`, 165, y)
+        y += 7
+      })
+
+      y += 3
+      doc.line(14, y, 196, y)
+      y += 10
+      doc.setFontSize(13)
+      doc.text(`Total: $${meta.total.toFixed(2)}`, 145, y)
+
+      doc.save(`Factura-${meta.id}.pdf`)
     },
     getStatusClass(status) {
       const map = {
@@ -1496,13 +1641,6 @@ export default {
       } catch (e) {
         // no-op: puede que el SDK no tenga unsubscribe o ya esté desconectado
       }
-    },
-    copyTrackingLink() {
-      if (!this.trackingLink) return
-      navigator.clipboard
-        .writeText(this.trackingLink)
-        .then(() => alert('✅ Link copiado. Ábrelo en el celular del repartidor.'))
-        .catch(() => alert('No se pudo copiar automáticamente. Selecciona el texto y cópialo a mano.'))
     },
 
     // ─── Mapa real (Leaflet) ──────────────────────
@@ -2456,6 +2594,64 @@ header img {
 }
 .in-stock { color: var(--green-600); }
 .out-of-stock { color: #ef4444; }
+
+/* ── Modal detalle de pedido / factura ───────── */
+.order-detail-modal h2 {
+  margin-top: 0;
+  font-size: 1.3rem;
+  color: #005e59;
+}
+.order-detail-summary {
+  background: #f7fafc;
+  border-radius: 12px;
+  padding: 0.9rem 1rem;
+  margin-bottom: 1rem;
+  font-size: 0.9rem;
+  color: #4a5568;
+}
+.order-detail-summary p {
+  margin: 0.25rem 0;
+}
+.order-detail-products {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  max-height: 320px;
+  overflow-y: auto;
+}
+.order-detail-product-row {
+  display: flex;
+  gap: 0.8rem;
+  align-items: center;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 0.6rem;
+}
+.order-detail-product-img {
+  width: 56px;
+  height: 56px;
+  object-fit: cover;
+  border-radius: 8px;
+  flex-shrink: 0;
+  background: #f0f0f0;
+}
+.order-detail-product-info {
+  flex: 1;
+}
+.order-detail-product-title {
+  font-weight: 600;
+  color: #2d3748;
+  font-size: 0.92rem;
+}
+.order-detail-product-company {
+  font-size: 0.8rem;
+  color: #005e59;
+  margin: 0.15rem 0;
+}
+.order-detail-product-meta {
+  font-size: 0.82rem;
+  color: #718096;
+}
 
 /* ── Modal de pago ───────────────────────────── */
 .checkout-modal h2 {

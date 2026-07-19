@@ -993,79 +993,40 @@
           </button>
         </div>
 
-        <div class="messages-layout" v-if="messagesTab === 'drivers'">
-          <!-- Columna izquierda: Lista de conversaciones -->
-          <div class="conversations-list">
-            <div class="conversations-header">
-              <h4>Conversaciones</h4>
-              <span class="online-count">{{ onlineDriversCount }} en línea</span>
+        <div class="tracking-links-panel" v-if="messagesTab === 'drivers'">
+          <div class="card-panel">
+            <div class="panel-header">
+              <h3><i class="fas fa-link"></i> Link de seguimiento por pedido</h3>
             </div>
-            <div class="conversation-item" 
-              v-for="driver in drivers" 
-              :key="driver.id"
-              :class="{ active: selectedChatDriver === driver.id }"
-              @click="selectDriverChat(driver)"
-            >
-              <div class="conv-avatar">
-                <span>{{ driver.initials }}</span>
-                <span class="status-dot" :class="driver.status === 'Descanso' ? 'offline' : 'online'"></span>
-              </div>
-              <div class="conv-info">
-                <div class="conv-name">{{ driver.name }}</div>
-                <div class="conv-last-msg">{{ getLastMessage(driver.id) }}</div>
-              </div>
-              <div class="conv-time">{{ getLastTime(driver.id) }}</div>
-            </div>
-          </div>
-
-          <!-- Columna derecha: Chat + Mapa -->
-          <div class="chat-panel">
-            <!-- Encabezado del chat -->
-            <div class="chat-header" v-if="selectedDriver">
-              <div class="chat-driver-info">
-                <div class="chat-driver-avatar">{{ selectedDriver.initials }}</div>
-                <div>
-                  <div class="chat-driver-name">{{ selectedDriver.name }}</div>
-                  <div class="chat-driver-status">
-                    <span class="status-dot small" :class="selectedDriver.status === 'Descanso' ? 'offline' : 'online'"></span>
-                    {{ selectedDriver.status }}
+            <p class="settings-hint" style="padding: 0 1.2rem; margin-top: 0.8rem;">
+              Genera un link por pedido y compártelo con el repartidor. Al abrirlo desde su celular, podrá compartir su ubicación en tiempo real y chatear directamente con el cliente — todo dentro de esa misma página, sin necesidad de cuenta.
+            </p>
+            <div class="tracking-orders-list">
+              <div v-for="order in companyOrdersList" :key="order.orderId" class="tracking-order-item">
+                <div class="tracking-order-info">
+                  <div class="tracking-order-id">Pedido {{ order.orderId }}</div>
+                  <div class="tracking-order-client">
+                    <i class="fas fa-user"></i> {{ order.clientName || 'Cliente' }}
+                    · {{ order.items.length }} producto{{ order.items.length === 1 ? '' : 's' }}
                   </div>
                 </div>
-              </div>
-              <div class="chat-header-actions">
-                <button class="btn btn-outline btn-sm" @click="viewDriverOnMap(selectedDriver)">
-                  <i class="fas fa-map-marker-alt"></i> Ver en mapa
+                <button class="btn btn-outline btn-sm" @click="toggleTrackingLink(order.orderId)">
+                  <i class="fas fa-link"></i> {{ expandedTrackingOrderId === order.orderId ? 'Ocultar link' : 'Generar link' }}
                 </button>
               </div>
+              <p v-if="!companyOrdersList.length" class="empty-catalog-msg">
+                Aún no tienes pedidos con ventas registradas.
+              </p>
             </div>
 
-            <!-- Mensajes -->
-            <div class="chat-messages-box" ref="chatBoxMessages">
-              <div 
-                v-for="(msg, i) in currentChatMessages" 
-                :key="i"
-                class="chat-bubble"
-                :class="msg.from === 'empresa' ? 'bubble-empresa' : 'bubble-driver'"
-              >
-                <div class="bubble-text">{{ msg.text }}</div>
-                <div class="bubble-time">{{ msg.time }}</div>
+            <div class="driver-share-link" v-if="expandedTrackingOrderId">
+              <p class="share-link-label">Link para que el repartidor comparta su ubicación (Pedido {{ expandedTrackingOrderId }}):</p>
+              <div class="share-link-row">
+                <input type="text" readonly :value="getTrackingLink(expandedTrackingOrderId)" @click="$event.target.select()" />
+                <button class="btn btn-outline btn-sm" @click="copyOrderTrackingLink(expandedTrackingOrderId)">
+                  <i class="fas fa-copy"></i> Copiar
+                </button>
               </div>
-              <div class="typing-indicator" v-if="driverTyping">
-                <span></span><span></span><span></span>
-              </div>
-            </div>
-
-            <!-- Input -->
-            <div class="chat-input">
-              <input 
-                v-model="chatInputMsg" 
-                type="text" 
-                placeholder="Escribe un mensaje..." 
-                @keyup.enter="sendChatMessage"
-              />
-              <button class="btn btn-primary" @click="sendChatMessage" :disabled="!chatInputMsg.trim()">
-                <i class="fas fa-paper-plane"></i> Enviar
-              </button>
             </div>
           </div>
         </div>
@@ -1141,40 +1102,17 @@
           <div class="card-panel">
             <div class="panel-header">
               <h3><i class="fas fa-map"></i> Ubicación de repartidores en tiempo real</h3>
-              <span class="panel-badge">Actualizado hace {{ mapUpdateSeconds }}s</span>
+              <span class="panel-badge">
+                <span v-if="activeDeliveries.length">{{ activeDeliveries.length }} activo{{ activeDeliveries.length === 1 ? '' : 's' }} · </span>
+                Actualizado hace {{ mapUpdateSeconds }}s
+              </span>
             </div>
             <div class="map-container">
-              <svg viewBox="0 0 800 400" xmlns="http://www.w3.org/2000/svg" class="map-svg-large">
-                <rect width="800" height="400" fill="#e8f4f0" rx="12"/>
-                <!-- Calles -->
-                <line x1="0" y1="200" x2="800" y2="200" stroke="#c5ddd8" stroke-width="12"/>
-                <line x1="400" y1="0" x2="400" y2="400" stroke="#c5ddd8" stroke-width="12"/>
-                <line x1="0" y1="100" x2="800" y2="100" stroke="#d3e8e4" stroke-width="6"/>
-                <line x1="0" y1="300" x2="800" y2="300" stroke="#d3e8e4" stroke-width="6"/>
-                <line x1="200" y1="0" x2="200" y2="400" stroke="#d3e8e4" stroke-width="6"/>
-                <line x1="600" y1="0" x2="600" y2="400" stroke="#d3e8e4" stroke-width="6"/>
-                <!-- Rutas activas -->
-                <polyline points="100,320 250,240 400,200 550,140 700,110"
-                  fill="none" stroke="#00b0a8" stroke-width="4" stroke-dasharray="8,4" opacity="0.8"/>
-                <polyline points="100,320 200,260 300,240 450,220"
-                  fill="none" stroke="#3A7DBF" stroke-width="4" stroke-dasharray="8,4" opacity="0.8"/>
-                <!-- Marcadores de repartidores con ubicaciones simuladas -->
-                <g v-for="(d, index) in activeDriversForMap" :key="d.id">
-                  <circle :cx="driverPositions[index].cx" :cy="driverPositions[index].cy" r="16" fill="#00b0a8" opacity="0.9"/>
-                  <text :x="driverPositions[index].cx" :y="driverPositions[index].cy+5" text-anchor="middle" fill="white" font-size="12">🚚</text>
-                  <text :x="driverPositions[index].cx" :y="driverPositions[index].cy-20" text-anchor="middle" fill="#005e59" font-size="10" font-weight="bold">{{ d.name }}</text>
-                </g>
-                <!-- Destinos -->
-                <circle cx="700" cy="110" r="12" fill="#005e59" opacity="0.9"/>
-                <text x="700" y="115" text-anchor="middle" fill="white" font-size="10">📦</text>
-                <circle cx="450" cy="220" r="12" fill="#0B3C6D" opacity="0.9"/>
-                <text x="450" y="225" text-anchor="middle" fill="white" font-size="10">📦</text>
-                <!-- Almacén -->
-                <rect x="80" y="290" width="50" height="40" fill="#005e59" rx="6" opacity="0.85"/>
-                <text x="105" y="314" text-anchor="middle" fill="white" font-size="12">🏭</text>
-                <!-- Leyenda -->
-                <text x="400" y="380" text-anchor="middle" fill="#5a8a86" font-size="11" font-family="Segoe UI">Mapa de seguimiento en tiempo real — Unify</text>
-              </svg>
+              <div ref="fleetMapEl" class="fleet-map-real"></div>
+              <p v-if="activeDeliveries.length === 0" class="fleet-map-empty">
+                No hay repartidores compartiendo su ubicación en este momento.
+                Un pedido aparece aquí en cuanto el repartidor abre su link de seguimiento.
+              </p>
             </div>
           </div>
         </div>
@@ -1215,6 +1153,8 @@
 
 <script>
 import { insforge } from '../insforgeClient.js'
+import L from 'leaflet'
+import 'leaflet/dist/leaflet.css'
 
 export default {
   name: 'EmpresaDashboard',
@@ -1352,11 +1292,13 @@ export default {
       ],
 
       // ─── Chat ──────────────────────────────────────
-      selectedChatDriver: 1,
-      chatInputMsg: '',
-      driverTyping: false,
       mapUpdateSeconds: 0,
+      fleetMap: null,
+      fleetMarkers: {}, // key: order_id
+      activeDeliveries: [], // [{ orderId, lat, lng, clientName }]
+      fleetPollInterval: null,
       messagesTab: 'drivers', // 'drivers' | 'clients'
+      expandedTrackingOrderId: null,
       clientConversations: [],
       selectedClientId: null,
       selectedClientName: '',
@@ -1365,22 +1307,6 @@ export default {
       clientChatLoading: false,
       clientChatPollInterval: null,
       conversationsPollInterval: null,
-      driverChats: {
-        1: [
-          { from: 'driver', name: 'Carlos M.', text: 'Salí del almacén con 3 pedidos. ETA zona sur: 15 min.', time: '10:30' },
-          { from: 'empresa', name: 'Empresa',  text: 'Perfecto Carlos, el pedido #SHP-001 es prioritario.', time: '10:31' },
-          { from: 'driver', name: 'Carlos M.', text: 'Entendido, lo entrego primero.', time: '10:32' },
-        ],
-        2: [
-          { from: 'driver', name: 'Ana R.',   text: 'En camino a zona norte, sin incidencias.', time: '10:45' },
-          { from: 'empresa', name: 'Empresa', text: 'Bien Ana, cualquier novedad me avisas.', time: '10:46' },
-        ],
-        4: [
-          { from: 'driver', name: 'María G.', text: 'Entregué 4 pedidos, voy por el 5to.', time: '11:00' },
-          { from: 'empresa', name: 'Empresa', text: 'Excelente María, gran trabajo hoy.', time: '11:01' },
-          { from: 'driver', name: 'María G.', text: 'Gracias, el 5to lo entrego en 10 min.', time: '11:02' },
-        ],
-      },
     }
   },
 
@@ -1682,28 +1608,36 @@ export default {
       )
     },
 
-    // ─── Chat ──────────────────────────────────────
-    selectedDriver() {
-      return this.drivers.find(d => d.id === this.selectedChatDriver)
-    },
-    currentChatMessages() {
-      return this.driverChats[this.selectedChatDriver] || []
+    // ─── Pedidos reales (agrupados desde 'sales') para generar el link de seguimiento ───
+    companyOrdersList() {
+      const groups = {}
+      ;(this.realSalesRecords || []).forEach((row) => {
+        if (!groups[row.order_ref]) {
+          groups[row.order_ref] = {
+            orderId: row.order_ref,
+            clientName: row.client_name,
+            items: [],
+          }
+        }
+        groups[row.order_ref].items.push(row.product_title)
+      })
+      return Object.values(groups)
     },
     onlineDriversCount() {
       return this.drivers.filter(d => d.status !== 'Descanso').length
     },
-    activeDriversForMap() {
-      return this.drivers.filter(d => d.status === 'En ruta' || d.status === 'Activo')
+    showFleetMap() {
+      return this.currentView === 'messages' && this.messagesTab === 'drivers'
     },
-    driverPositions() {
-      // Posiciones simuladas para el mapa grande
-      const positions = [
-        { cx: 350, cy: 150 },
-        { cx: 500, cy: 100 },
-        { cx: 200, cy: 250 },
-        { cx: 600, cy: 200 },
-      ]
-      return this.activeDriversForMap.map((d, i) => positions[i % positions.length])
+  },
+
+  watch: {
+    showFleetMap(isVisible) {
+      if (isVisible) {
+        this.$nextTick(() => this.initFleetMap())
+      } else {
+        this.teardownFleetMap()
+      }
     },
   },
 
@@ -1713,7 +1647,8 @@ export default {
     this.loadSalesData()
     this.loadReviewsData()
     document.addEventListener('click', this.closeProfileMenuOutside)
-    // Simular actualización del mapa
+    // Contador de segundos desde la última actualización real del mapa de flota
+    // (se reinicia a 0 cada vez que loadActiveDeliveries() trae datos nuevos)
     setInterval(() => {
       this.mapUpdateSeconds = (this.mapUpdateSeconds % 60) + 1
     }, 1000)
@@ -1723,9 +1658,141 @@ export default {
     document.removeEventListener('click', this.closeProfileMenuOutside)
     if (this.conversationsPollInterval) clearInterval(this.conversationsPollInterval)
     if (this.clientChatPollInterval) clearInterval(this.clientChatPollInterval)
+    this.teardownFleetMap()
   },
 
   methods: {
+    // ─── Mapa real de flota (Leaflet + driver_locations) ───
+    initFleetMap() {
+      const mapEl = this.$refs.fleetMapEl
+      if (!mapEl || this.fleetMap) return
+
+      const defaultCenter = [13.6929, -89.2182] // San Salvador, El Salvador
+      this.fleetMap = L.map(mapEl).setView(defaultCenter, 12)
+
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+        maxZoom: 19,
+      }).addTo(this.fleetMap)
+
+      this.$nextTick(() => {
+        if (this.fleetMap) this.fleetMap.invalidateSize()
+      })
+
+      this.loadActiveDeliveries()
+      if (this.fleetPollInterval) clearInterval(this.fleetPollInterval)
+      this.fleetPollInterval = setInterval(() => this.loadActiveDeliveries(), 5000)
+    },
+
+    teardownFleetMap() {
+      if (this.fleetPollInterval) {
+        clearInterval(this.fleetPollInterval)
+        this.fleetPollInterval = null
+      }
+      if (this.fleetMap) {
+        this.fleetMap.remove()
+        this.fleetMap = null
+      }
+      this.fleetMarkers = {}
+    },
+
+    async loadActiveDeliveries() {
+      try {
+        const { data: locations, error: locError } = await insforge.database
+          .from('driver_locations')
+          .select('*')
+          .order('created_at', { ascending: false })
+
+        if (locError) {
+          console.warn('No se pudieron cargar las ubicaciones activas:', locError)
+          return
+        }
+
+        // Solo la más reciente por pedido, y solo si se actualizó en los últimos 10 minutos
+        const tenMinutesAgo = Date.now() - 10 * 60 * 1000
+        const latestByOrder = {}
+        ;(locations || []).forEach((row) => {
+          if (latestByOrder[row.order_id]) return
+          const rowTime = row.created_at ? new Date(row.created_at).getTime() : 0
+          if (rowTime < tenMinutesAgo) return
+          latestByOrder[row.order_id] = row
+        })
+
+        const orderIds = Object.keys(latestByOrder)
+        const namesByOrder = {}
+        this.companyOrdersList.forEach((o) => { namesByOrder[o.orderId] = o.clientName })
+
+        this.activeDeliveries = orderIds.map((orderId) => ({
+          orderId,
+          lat: latestByOrder[orderId].lat,
+          lng: latestByOrder[orderId].lng,
+          clientName: namesByOrder[orderId] || null,
+        }))
+
+        this.updateFleetMarkers()
+        this.mapUpdateSeconds = 0
+      } catch (err) {
+        console.warn('Error inesperado cargando entregas activas:', err)
+      }
+    },
+
+    updateFleetMarkers() {
+      if (!this.fleetMap) return
+
+      const currentIds = this.activeDeliveries.map((d) => d.orderId)
+
+      Object.keys(this.fleetMarkers).forEach((orderId) => {
+        if (!currentIds.includes(orderId)) {
+          this.fleetMap.removeLayer(this.fleetMarkers[orderId])
+          delete this.fleetMarkers[orderId]
+        }
+      })
+
+      const truckIcon = L.divIcon({
+        html: '<div style="font-size: 24px; line-height: 1;">🚚</div>',
+        className: 'driver-marker-icon',
+        iconSize: [28, 28],
+        iconAnchor: [14, 14],
+      })
+
+      this.activeDeliveries.forEach((delivery) => {
+        const label = delivery.clientName
+          ? `Pedido ${delivery.orderId} — ${delivery.clientName}`
+          : `Pedido ${delivery.orderId}`
+
+        if (this.fleetMarkers[delivery.orderId]) {
+          this.fleetMarkers[delivery.orderId].setLatLng([delivery.lat, delivery.lng])
+        } else {
+          this.fleetMarkers[delivery.orderId] = L.marker([delivery.lat, delivery.lng], { icon: truckIcon })
+            .addTo(this.fleetMap)
+            .bindPopup(label)
+        }
+      })
+
+      const markerList = Object.values(this.fleetMarkers)
+      if (markerList.length > 0) {
+        const group = L.featureGroup(markerList)
+        this.fleetMap.fitBounds(group.getBounds().pad(0.3), { maxZoom: 15 })
+      }
+    },
+
+    // ─── Link de seguimiento por pedido (real) ───
+    getTrackingLink(orderId) {
+      if (!orderId) return ''
+      return `${window.location.origin}/repartidor/${encodeURIComponent(orderId)}`
+    },
+    toggleTrackingLink(orderId) {
+      this.expandedTrackingOrderId = this.expandedTrackingOrderId === orderId ? null : orderId
+    },
+    copyOrderTrackingLink(orderId) {
+      const link = this.getTrackingLink(orderId)
+      if (!link) return
+      navigator.clipboard
+        .writeText(link)
+        .then(() => alert('✅ Link copiado. Compártelo con el repartidor para que envíe su ubicación.'))
+        .catch(() => alert('No se pudo copiar automáticamente. Selecciona el texto y cópialo a mano.'))
+    },
+
     // ─── Perfil ────────────────────────────────
     async loadCompanyProfile() {
       try {
@@ -2256,91 +2323,20 @@ export default {
       this.currentView = 'messages'
     },
     openChat(s) {
-      const driver = this.drivers.find(d => d.name === s.driver)
-      if (driver) {
-        this.selectedChatDriver = driver.id
-        this.currentView = 'messages'
-      } else {
-        alert('Conductor no encontrado')
-      }
+      this.currentView = 'messages'
+      this.messagesTab = 'drivers'
     },
     openChatForOrder(order) {
-      // Simular asignación de un conductor al pedido
-      const driver = this.drivers.find(d => d.status !== 'Descanso')
-      if (driver) {
-        this.selectedChatDriver = driver.id
-        this.currentView = 'messages'
-        alert(`💬 Abriendo chat con ${driver.name} para el pedido ${order.id}`)
-      } else {
-        alert('No hay conductores disponibles')
-      }
+      this.currentView = 'messages'
+      this.messagesTab = 'drivers'
+      this.expandedTrackingOrderId = order.id
     },
     openChatWithDriver(driver) {
-      this.selectedChatDriver = driver.id
       this.currentView = 'messages'
+      this.messagesTab = 'drivers'
     },
     assignRoute() {
       alert('🗺️ Asignador de rutas…')
-    },
-
-    // ─── Chat ────────────────────────────────────
-    selectDriverChat(driver) {
-      this.selectedChatDriver = driver.id
-    },
-    getLastMessage(driverId) {
-      const msgs = this.driverChats[driverId] || []
-      return msgs.length ? msgs[msgs.length - 1].text : 'Sin mensajes'
-    },
-    getLastTime(driverId) {
-      const msgs = this.driverChats[driverId] || []
-      return msgs.length ? msgs[msgs.length - 1].time : ''
-    },
-    viewDriverOnMap(driver) {
-      alert(`📍 Mostrando ubicación de ${driver.name} en el mapa`)
-    },
-    sendChatMessage() {
-      const msg = this.chatInputMsg.trim()
-      if (!msg || !this.selectedDriver) return
-      if (!this.driverChats[this.selectedChatDriver]) {
-        this.$set(this.driverChats, this.selectedChatDriver, [])
-      }
-      const now = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-      this.driverChats[this.selectedChatDriver].push({
-        from: 'empresa',
-        name: this.companyName,
-        text: msg,
-        time: now
-      })
-      this.chatInputMsg = ''
-      this.$nextTick(() => {
-        this.scrollChatToBottom()
-      })
-      // Simular respuesta del driver
-      this.driverTyping = true
-      setTimeout(() => {
-        this.driverTyping = false
-        const replies = [
-          'Recibido, lo reviso ahora mismo ✅',
-          'Entendido, en camino con el pedido.',
-          'Ok, cualquier novedad te aviso.',
-          'Confirmado, entrega en 15 min.',
-        ]
-        const reply = replies[Math.floor(Math.random() * replies.length)]
-        const driverName = this.selectedDriver.name.split(' ')[0]
-        this.driverChats[this.selectedChatDriver].push({
-          from: 'driver',
-          name: driverName,
-          text: reply,
-          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-        })
-        this.$nextTick(() => {
-          this.scrollChatToBottom()
-        })
-      }, 1500)
-    },
-    scrollChatToBottom() {
-      const box = this.$refs.chatBoxMessages
-      if (box) box.scrollTop = box.scrollHeight
     },
   },
 }
@@ -4271,6 +4267,30 @@ export default {
   display: flex;
   gap: 0.5rem;
 }
+.driver-share-link {
+  padding: 0.8rem 1.2rem;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-light);
+}
+.share-link-label {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  margin: 0 0 0.4rem;
+}
+.share-link-row {
+  display: flex;
+  gap: 0.4rem;
+}
+.share-link-row input {
+  flex: 1;
+  min-width: 0;
+  padding: 0.5rem 0.7rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  background: white;
+}
 .chat-messages-box {
   flex: 1;
   padding: 1rem 1.2rem;
@@ -4360,11 +4380,59 @@ export default {
   background: var(--bg-light);
   border-radius: var(--radius-lg);
   overflow: hidden;
+  position: relative;
 }
-.map-svg-large {
+.fleet-map-real {
   width: 100%;
-  height: auto;
-  display: block;
+  height: 420px;
+}
+.fleet-map-empty {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: white;
+  padding: 1rem 1.5rem;
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-md);
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  text-align: center;
+  max-width: 320px;
+}
+
+/* ── Panel de links de seguimiento por pedido ─── */
+.tracking-links-panel {
+  margin-bottom: 1.5rem;
+}
+.tracking-orders-list {
+  padding: 0.5rem 1.2rem 1rem;
+}
+.tracking-order-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.8rem 0;
+  border-bottom: 1px solid var(--border);
+}
+.tracking-order-item:last-child {
+  border-bottom: none;
+}
+.tracking-order-id {
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+.tracking-order-client {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  margin-top: 0.15rem;
+}
+.empty-catalog-msg {
+  color: var(--text-muted);
+  text-align: center;
+  padding: 1.5rem 0;
+  font-size: 0.85rem;
 }
 
 /* ══════════════════════════════════════════
