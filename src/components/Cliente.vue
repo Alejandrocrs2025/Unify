@@ -14,10 +14,6 @@
           <li @click="currentView = 'products'" :class="{ active: currentView === 'products' }">
             <i class="fas fa-box"></i> Productos
           </li>
-          <li @click="currentView = 'products'" :class="{ active: currentView === 'products' }" class="cart-nav-item">
-            <i class="fas fa-shopping-cart"></i> Carrito
-            <span v-if="cartItemCount > 0" class="cart-nav-badge">{{ cartItemCount }}</span>
-          </li>
           <li @click="currentView = 'orders'" :class="{ active: currentView === 'orders' }">
             <i class="fas fa-shopping-bag"></i> Mis Pedidos
           </li>
@@ -26,6 +22,10 @@
           </li>
           <li @click="currentView = 'profile'" :class="{ active: currentView === 'profile' }">
             <i class="fas fa-user"></i> Perfil
+          </li>
+          <li @click="currentView = 'products'" :class="{ active: currentView === 'products' }" class="cart-nav-item" title="Carrito">
+            <i class="fas fa-shopping-cart"></i>
+            <span v-if="cartItemCount > 0" class="cart-nav-badge">{{ cartItemCount }}</span>
           </li>
           <li @click="signOut" class="logout-item">
             <i class="fas fa-sign-out-alt"></i> Cerrar sesión

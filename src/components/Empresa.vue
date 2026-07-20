@@ -791,67 +791,95 @@
       <template v-if="currentView === 'fleet'">
         <div class="page-header">
           <h2><i class="fas fa-truck"></i> Gestión de Flota</h2>
-          <p class="page-subtitle">Controla a tus repartidores y rutas de entrega</p>
+          <p class="page-subtitle">Estado real de tus entregas en curso</p>
+        </div>
+
+        <div class="fleet-kpi-row">
+          <div class="card-panel fleet-kpi-card">
+            <div class="fleet-kpi-number">{{ activeDeliveries.length }}</div>
+            <div class="fleet-kpi-label"><i class="fas fa-truck-moving"></i> Entregas activas ahora</div>
+          </div>
+          <div class="card-panel fleet-kpi-card">
+            <div class="fleet-kpi-number">{{ pendingTrackingOrders.length }}</div>
+            <div class="fleet-kpi-label"><i class="fas fa-hourglass-half"></i> Pedidos sin repartidor compartiendo ubicación</div>
+          </div>
+          <div class="card-panel fleet-kpi-card">
+            <div class="fleet-kpi-number">{{ companyOrdersList.length }}</div>
+            <div class="fleet-kpi-label"><i class="fas fa-box"></i> Pedidos con venta registrada</div>
+          </div>
         </div>
 
         <div class="dashboard-grid">
           <div class="card-panel">
             <div class="panel-header">
-              <h3><i class="fas fa-users"></i> Repartidores activos</h3>
-              <button class="btn btn-primary btn-sm" @click="assignRoute">
-                <i class="fas fa-route"></i> Asignar ruta
-              </button>
+              <h3><i class="fas fa-shipping-fast"></i> Entregas en curso</h3>
+              <span class="panel-badge" v-if="activeDeliveries.length">{{ activeDeliveries.length }} en camino</span>
             </div>
-            <div class="product-list">
-              <div class="product-item" v-for="driver in drivers" :key="driver.id">
+            <div class="product-list" v-if="activeDeliveriesEnriched.length">
+              <div class="product-item" v-for="d in activeDeliveriesEnriched" :key="d.orderId">
                 <div class="product-left">
-                  <div class="driver-avatar">{{ driver.initials }}</div>
+                  <div class="driver-avatar">🚚</div>
                   <div>
-                    <div class="product-name">{{ driver.name }}</div>
+                    <div class="product-name">Pedido {{ d.orderId }}</div>
                     <div class="product-stock">
-                      <i class="fas fa-map-marker-alt" style="color:var(--green-400)"></i> 
-                      {{ driver.zone }} · {{ driver.deliveries }} entregas
+                      <i class="fas fa-user" style="color:var(--green-400)"></i>
+                      {{ d.clientName || 'Cliente' }} · {{ d.itemCount }} producto{{ d.itemCount === 1 ? '' : 's' }}
                     </div>
                   </div>
                 </div>
                 <div class="driver-right">
-                  <span class="status-badge" :class="getDriverStatusClass(driver.status)">{{ driver.status }}</span>
-                  <div class="driver-rating">⭐ {{ driver.rating }}</div>
-                  <button class="btn btn-outline btn-sm" @click="openChatWithDriver(driver)">
-                    <i class="fas fa-comment"></i> Chat
+                  <span class="status-badge status-shipped">En camino</span>
+                  <button class="btn btn-outline btn-sm" @click="openChatForOrder({ id: d.orderId })">
+                    <i class="fas fa-comment"></i> Ver chat
                   </button>
                 </div>
               </div>
             </div>
+            <p v-else class="empty-catalog-msg">
+              Ningún repartidor está compartiendo su ubicación en este momento.
+            </p>
+
+            <div class="panel-header" style="margin-top: 1.2rem;">
+              <h3><i class="fas fa-link"></i> Pendientes de link</h3>
+            </div>
+            <div class="product-list" v-if="pendingTrackingOrders.length">
+              <div class="product-item" v-for="o in pendingTrackingOrders" :key="o.orderId">
+                <div class="product-left">
+                  <div class="driver-avatar">📦</div>
+                  <div>
+                    <div class="product-name">Pedido {{ o.orderId }}</div>
+                    <div class="product-stock">
+                      <i class="fas fa-user" style="color:var(--green-400)"></i>
+                      {{ o.clientName || 'Cliente' }} · {{ o.items.length }} producto{{ o.items.length === 1 ? '' : 's' }}
+                    </div>
+                  </div>
+                </div>
+                <div class="driver-right">
+                  <button class="btn btn-primary btn-sm" @click="copyOrderTrackingLink(o.orderId)">
+                    <i class="fas fa-copy"></i> Copiar link
+                  </button>
+                  <button class="btn btn-outline btn-sm" title="Quitar de esta lista" @click="dismissTrackingOrder(o.orderId)">
+                    <i class="fas fa-times"></i>
+                  </button>
+                </div>
+              </div>
+            </div>
+            <p v-else class="empty-catalog-msg">
+              Todos tus pedidos con venta registrada ya tienen a alguien compartiendo su ubicación, o aún no tienes pedidos.
+            </p>
           </div>
 
           <div class="card-panel">
             <div class="panel-header">
               <h3><i class="fas fa-map"></i> Mapa de entregas</h3>
-              <span class="panel-badge">En vivo</span>
+              <span class="panel-badge">Actualizado hace {{ mapUpdateSeconds }}s</span>
             </div>
-            <div class="mini-map-wrap">
-              <div class="mini-map-canvas">
-                <svg viewBox="0 0 600 280" xmlns="http://www.w3.org/2000/svg" class="map-svg">
-                  <rect width="600" height="280" fill="#e8f4f0" rx="12"/>
-                  <line x1="0" y1="140" x2="600" y2="140" stroke="#c5ddd8" stroke-width="10"/>
-                  <line x1="300" y1="0" x2="300" y2="280" stroke="#c5ddd8" stroke-width="10"/>
-                  <polyline points="80,220 200,160 300,140 410,100 520,80"
-                    fill="none" stroke="#00b0a8" stroke-width="3" stroke-dasharray="8,4" opacity="0.9"/>
-                  <circle cx="520" cy="80" r="10" fill="#005e59" opacity="0.9"/>
-                  <text x="520" y="84" text-anchor="middle" fill="white" font-size="10">📦</text>
-                  <g transform="translate(405,95)">
-                    <circle r="14" fill="#00b0a8" opacity="0.95"/>
-                    <text y="4" text-anchor="middle" font-size="12">🚚</text>
-                  </g>
-                  <rect x="60" y="200" width="40" height="30" fill="#005e59" rx="4" opacity="0.85"/>
-                  <text x="80" y="219" text-anchor="middle" fill="white" font-size="10">🏭</text>
-                </svg>
-                <div class="map-legend">
-                  <span class="legend-item"><span class="legend-dot" style="background:#00b0a8"></span>Ruta activa</span>
-                  <span class="legend-item">🏭 Almacén · 📦 Destino</span>
-                </div>
-              </div>
+            <div class="map-container">
+              <div ref="fleetMapEl" class="fleet-map-real"></div>
+              <p v-if="activeDeliveries.length === 0" class="fleet-map-empty">
+                No hay repartidores compartiendo su ubicación en este momento.
+                Copia el link de un pedido y ábrelo desde el celular del repartidor para verlo aquí.
+              </p>
             </div>
           </div>
         </div>
@@ -1002,7 +1030,7 @@
               Genera un link por pedido y compártelo con el repartidor. Al abrirlo desde su celular, podrá compartir su ubicación en tiempo real y chatear directamente con el cliente — todo dentro de esa misma página, sin necesidad de cuenta.
             </p>
             <div class="tracking-orders-list">
-              <div v-for="order in companyOrdersList" :key="order.orderId" class="tracking-order-item">
+              <div v-for="order in visibleCompanyOrdersList" :key="order.orderId" class="tracking-order-item">
                 <div class="tracking-order-info">
                   <div class="tracking-order-id">Pedido {{ order.orderId }}</div>
                   <div class="tracking-order-client">
@@ -1010,12 +1038,24 @@
                     · {{ order.items.length }} producto{{ order.items.length === 1 ? '' : 's' }}
                   </div>
                 </div>
-                <button class="btn btn-outline btn-sm" @click="toggleTrackingLink(order.orderId)">
-                  <i class="fas fa-link"></i> {{ expandedTrackingOrderId === order.orderId ? 'Ocultar link' : 'Generar link' }}
-                </button>
+                <div style="display:flex; gap:0.4rem;">
+                  <button class="btn btn-outline btn-sm" @click="toggleTrackingLink(order.orderId)">
+                    <i class="fas fa-link"></i> {{ expandedTrackingOrderId === order.orderId ? 'Ocultar link' : 'Generar link' }}
+                  </button>
+                  <button class="btn btn-outline btn-sm" title="Quitar de esta lista" @click="dismissTrackingOrder(order.orderId)">
+                    <i class="fas fa-times"></i> Quitar
+                  </button>
+                </div>
               </div>
               <p v-if="!companyOrdersList.length" class="empty-catalog-msg">
                 Aún no tienes pedidos con ventas registradas.
+              </p>
+              <p v-else-if="!visibleCompanyOrdersList.length" class="empty-catalog-msg">
+                Ocultaste todos los pedidos de esta lista.
+              </p>
+              <p v-if="dismissedOrderIds.length" class="settings-hint" style="padding: 0.4rem 1.2rem 0;">
+                {{ dismissedOrderIds.length }} pedido{{ dismissedOrderIds.length === 1 ? '' : 's' }} oculto{{ dismissedOrderIds.length === 1 ? '' : 's' }} ·
+                <a href="#" @click.prevent="restoreDismissedOrders" style="color: var(--sky-600, #0B3C6D);">Restaurar todos</a>
               </p>
             </div>
 
@@ -1148,6 +1188,12 @@
         <span class="footer-version">v2.0</span>
       </div>
     </footer>
+
+    <ChatbotWidget
+      context="empresa"
+      :user-name="companyName"
+      :context-data="{ currentView, lowStockCount, pendingTrackingOrders: pendingTrackingOrders.length, activeDeliveries: activeDeliveries.length }"
+    />
   </div>
 </template>
 
@@ -1155,9 +1201,11 @@
 import { insforge } from '../insforgeClient.js'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
+import ChatbotWidget from './ChatbotWidget.vue'
 
 export default {
   name: 'EmpresaDashboard',
+  components: { ChatbotWidget },
   emits: ['switch-view'],
 
   data() {
@@ -1278,13 +1326,6 @@ export default {
         { id: 4, icon: '⌨️', name: 'Teclado Mecánico', stock: 4, sku: 'TEC-MEC-004' },
       ],
 
-      drivers: [
-        { id: 1, initials: 'CM', name: 'Carlos Martínez', zone: 'Zona Sur', deliveries: 3, status: 'Activo', rating: '4.9' },
-        { id: 2, initials: 'AR', name: 'Ana Rodríguez', zone: 'Zona Norte', deliveries: 2, status: 'Activo', rating: '4.7' },
-        { id: 3, initials: 'LP', name: 'Luis Pérez', zone: 'Zona Este', deliveries: 0, status: 'Descanso', rating: '4.5' },
-        { id: 4, initials: 'MG', name: 'María González', zone: 'Zona Oeste', deliveries: 4, status: 'En ruta', rating: '5.0' },
-      ],
-
       notifications: [
         { id: 1, text: 'Pedido #4521 listo para envío', time: 'Hace 5 min', type: 'info', read: false },
         { id: 2, text: 'Stock crítico: Laptop Dell XPS (3 uds)', time: 'Hace 20 min', type: 'warning', read: false },
@@ -1299,6 +1340,7 @@ export default {
       fleetPollInterval: null,
       messagesTab: 'drivers', // 'drivers' | 'clients'
       expandedTrackingOrderId: null,
+      dismissedOrderIds: [], // pedidos que la empresa quitó de la lista de "generar link" (solo visual, no borra la venta)
       clientConversations: [],
       selectedClientId: null,
       selectedClientName: '',
@@ -1623,20 +1665,39 @@ export default {
       })
       return Object.values(groups)
     },
-    onlineDriversCount() {
-      return this.drivers.filter(d => d.status !== 'Descanso').length
+    // ─── Lista de pedidos visible en "Link de seguimiento" (sin los que la empresa ocultó) ───
+    visibleCompanyOrdersList() {
+      return this.companyOrdersList.filter((o) => !this.dismissedOrderIds.includes(o.orderId))
+    },
+    activeDeliveriesEnriched() {
+      const itemsByOrder = {}
+      this.companyOrdersList.forEach((o) => { itemsByOrder[o.orderId] = o })
+      return this.activeDeliveries.map((d) => ({
+        ...d,
+        clientName: d.clientName || itemsByOrder[d.orderId]?.clientName || null,
+        itemCount: itemsByOrder[d.orderId]?.items?.length || 1,
+      }))
+    },
+    pendingTrackingOrders() {
+      const activeIds = this.activeDeliveries.map((d) => d.orderId)
+      return this.visibleCompanyOrdersList.filter((o) => !activeIds.includes(o.orderId))
     },
     showFleetMap() {
-      return this.currentView === 'messages' && this.messagesTab === 'drivers'
+      if (this.currentView === 'fleet') return 'fleet'
+      if (this.currentView === 'messages' && this.messagesTab === 'drivers') return 'messages'
+      return false
     },
   },
 
   watch: {
-    showFleetMap(isVisible) {
-      if (isVisible) {
+    // showFleetMap ahora devuelve dónde se debe mostrar el mapa ('fleet' | 'messages' | false)
+    // en vez de un simple booleano: así, si se navega directo de una pestaña con mapa a la
+    // otra (ambas "true"), el watcher igual detecta el cambio de valor y reconstruye el mapa
+    // sobre el contenedor correcto (fleetMapEl) en vez de quedarse apuntando al anterior.
+    showFleetMap(newLocation) {
+      this.teardownFleetMap()
+      if (newLocation) {
         this.$nextTick(() => this.initFleetMap())
-      } else {
-        this.teardownFleetMap()
       }
     },
   },
@@ -1646,6 +1707,7 @@ export default {
     this.loadMyProducts()
     this.loadSalesData()
     this.loadReviewsData()
+    this.loadDismissedOrderIds()
     document.addEventListener('click', this.closeProfileMenuOutside)
     // Contador de segundos desde la última actualización real del mapa de flota
     // (se reinicia a 0 cada vez que loadActiveDeliveries() trae datos nuevos)
@@ -1791,6 +1853,35 @@ export default {
         .writeText(link)
         .then(() => alert('✅ Link copiado. Compártelo con el repartidor para que envíe su ubicación.'))
         .catch(() => alert('No se pudo copiar automáticamente. Selecciona el texto y cópialo a mano.'))
+    },
+
+    // ─── Ocultar pedidos de la lista de "Link de seguimiento" (solo visual, no borra la venta) ───
+    loadDismissedOrderIds() {
+      try {
+        const raw = localStorage.getItem('unify_dismissed_tracking_orders')
+        this.dismissedOrderIds = raw ? JSON.parse(raw) : []
+      } catch (e) {
+        this.dismissedOrderIds = []
+      }
+    },
+    saveDismissedOrderIds() {
+      try {
+        localStorage.setItem('unify_dismissed_tracking_orders', JSON.stringify(this.dismissedOrderIds))
+      } catch (e) {
+        console.warn('No se pudo guardar la lista de pedidos ocultos', e)
+      }
+    },
+    dismissTrackingOrder(orderId) {
+      if (this.dismissedOrderIds.includes(orderId)) return
+      this.dismissedOrderIds.push(orderId)
+      this.saveDismissedOrderIds()
+      if (this.expandedTrackingOrderId === orderId) {
+        this.expandedTrackingOrderId = null
+      }
+    },
+    restoreDismissedOrders() {
+      this.dismissedOrderIds = []
+      this.saveDismissedOrderIds()
     },
 
     // ─── Perfil ────────────────────────────────
@@ -2311,9 +2402,6 @@ export default {
     getOrderStatusClass(s) {
       return { 'Pendiente': 'status-pending', 'Enviado': 'status-shipped', 'Entregado': 'status-delivered', 'Cancelado': 'status-pending' }[s] || ''
     },
-    getDriverStatusClass(s) {
-      return { 'Activo': 'status-delivered', 'En ruta': 'status-shipped', 'Descanso': 'status-pending' }[s] || ''
-    },
     restock(p) {
       alert(`📦 Solicitando reabastecimiento: ${p.name}`)
       p.stock += 10
@@ -2330,13 +2418,6 @@ export default {
       this.currentView = 'messages'
       this.messagesTab = 'drivers'
       this.expandedTrackingOrderId = order.id
-    },
-    openChatWithDriver(driver) {
-      this.currentView = 'messages'
-      this.messagesTab = 'drivers'
-    },
-    assignRoute() {
-      alert('🗺️ Asignador de rutas…')
     },
   },
 }
@@ -2917,6 +2998,31 @@ export default {
 }
 .trend-up { color: var(--green-500); }
 .trend-down { color: #ef4444; }
+
+.fleet-kpi-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1.2rem;
+  margin-bottom: 1.5rem;
+}
+.fleet-kpi-card {
+  padding: 1.2rem 1.4rem;
+  text-align: center;
+}
+.fleet-kpi-number {
+  font-size: 2rem;
+  font-weight: 700;
+  color: var(--sky-600, #0B3C6D);
+  line-height: 1.1;
+}
+.fleet-kpi-label {
+  margin-top: 0.4rem;
+  font-size: 0.82rem;
+  color: var(--text-muted);
+}
+@media (max-width: 900px) {
+  .fleet-kpi-row { grid-template-columns: 1fr; }
+}
 
 .dashboard-grid {
   display: grid;
@@ -4082,41 +4188,6 @@ export default {
   font-size: 0.78rem;
   color: var(--text-muted);
   margin-top: 0.2rem;
-}
-
-/* ══════════════════════════════════════════
-   MAPA MINI (para flota)
-══════════════════════════════════════════ */
-.mini-map-wrap {
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  overflow: hidden;
-}
-.mini-map-canvas {
-  background: var(--bg-light);
-  position: relative;
-}
-.map-svg { width: 100%; height: auto; display: block; }
-.map-legend {
-  display: flex;
-  gap: 1rem;
-  justify-content: center;
-  padding: 0.5rem 1rem;
-  background: rgba(255,255,255,0.9);
-  flex-wrap: wrap;
-}
-.legend-item {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  font-size: 0.7rem;
-  color: var(--text-muted);
-}
-.legend-dot {
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  flex-shrink: 0;
 }
 
 /* ══════════════════════════════════════════
