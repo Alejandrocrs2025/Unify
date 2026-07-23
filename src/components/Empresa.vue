@@ -61,9 +61,34 @@
 
       <div class="header-right">
         <!-- Notificaciones -->
-        <div class="notif-bell" @click="toggleNotifications">
-          <i class="fas fa-bell"></i>
-          <span class="notif-badge" v-if="unreadCount > 0">{{ unreadCount }}</span>
+        <div class="notif-wrapper">
+          <div class="notif-bell" @click="toggleNotifications">
+            <i class="fas fa-bell"></i>
+            <span class="notif-badge" v-if="unreadNotificationsCount > 0">{{ unreadNotificationsCount }}</span>
+          </div>
+
+          <!-- Dropdown de notificaciones -->
+          <div class="notif-dropdown" v-if="notificationsOpen">
+            <div class="notif-dropdown-header">
+              <span>Compras recientes</span>
+            </div>
+            <div class="notif-dropdown-list" v-if="orderNotifications.length">
+              <div
+                v-for="n in orderNotifications"
+                :key="n.orderRef"
+                class="notif-item"
+                :class="{ 'notif-item-unread': n.isUnread }"
+                @click="openChatForOrder({ id: n.orderRef }); notificationsOpen = false"
+              >
+                <div class="notif-item-icon"><i class="fas fa-shopping-bag"></i></div>
+                <div class="notif-item-body">
+                  <div class="notif-item-title">{{ n.clientName || 'Un cliente' }} compró {{ n.itemCount }} producto{{ n.itemCount === 1 ? '' : 's' }}</div>
+                  <div class="notif-item-meta">Pedido {{ n.orderRef }} · ${{ n.total.toFixed(2) }} · {{ n.timeAgo }}</div>
+                </div>
+              </div>
+            </div>
+            <p v-else class="empty-catalog-msg" style="padding: 1rem;">Todavía no tienes compras registradas.</p>
+          </div>
         </div>
 
         <!-- Carrito (desde perspectiva empresa) -->
@@ -990,6 +1015,26 @@
             </div>
             <p v-else class="report-empty-hint">Ningún producto en riesgo de agotarse pronto 👍</p>
           </div>
+
+          <div class="card-panel report-card">
+            <div class="report-header">
+              <h4><i class="fas fa-star"></i> Reseñas de clientes</h4>
+              <span class="report-period">{{ realReviewsRecords.length }} reseña{{ realReviewsRecords.length === 1 ? '' : 's' }}</span>
+            </div>
+            <div class="reviews-panel-list" v-if="enrichedReviews.length > 0">
+              <div v-for="r in enrichedReviews" :key="r.id" class="review-item">
+                <div class="review-item-header">
+                  <span class="review-item-name">{{ r.client_name || 'Cliente' }}</span>
+                  <span class="review-item-stars">
+                    <span v-for="n in 5" :key="n" :class="{ 'star-filled': n <= r.rating }">★</span>
+                  </span>
+                </div>
+                <div class="review-item-product">{{ r.productTitle }}</div>
+                <p v-if="r.comment" class="review-item-comment">{{ r.comment }}</p>
+              </div>
+            </div>
+            <p v-else class="report-empty-hint">Todavía no tienes reseñas de clientes.</p>
+          </div>
         </div>
       </template>
 
@@ -1326,11 +1371,9 @@ export default {
         { id: 4, icon: '⌨️', name: 'Teclado Mecánico', stock: 4, sku: 'TEC-MEC-004' },
       ],
 
-      notifications: [
-        { id: 1, text: 'Pedido #4521 listo para envío', time: 'Hace 5 min', type: 'info', read: false },
-        { id: 2, text: 'Stock crítico: Laptop Dell XPS (3 uds)', time: 'Hace 20 min', type: 'warning', read: false },
-        { id: 3, text: 'Carlos Martínez completó 3 entregas', time: 'Hace 1 hora', type: 'success', read: true },
-      ],
+      notificationsOpen: false,
+      lastSeenNotificationsAt: null, // ISO string — pedidos con created_at posterior a esto cuentan como "no leídos"
+      salesPollInterval: null,
 
       // ─── Chat ──────────────────────────────────────
       mapUpdateSeconds: 0,
@@ -1359,8 +1402,32 @@ export default {
     companyInitials() {
       return this.companyName.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2)
     },
-    unreadCount() {
-      return this.notifications.filter(n => !n.read).length
+    // ─── Notificaciones de compras reales (agrupadas por pedido, desde `sales`) ───
+    orderNotifications() {
+      const groups = {}
+      this.realSalesRecords.forEach((row) => {
+        if (!groups[row.order_ref]) {
+          groups[row.order_ref] = {
+            orderRef: row.order_ref,
+            clientName: row.client_name,
+            total: 0,
+            itemCount: 0,
+            createdAt: row.created_at,
+          }
+        }
+        groups[row.order_ref].total += row.unit_price || 0
+        groups[row.order_ref].itemCount += 1
+      })
+      return Object.values(groups)
+        .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+        .map((n) => ({
+          ...n,
+          timeAgo: this.formatTimeAgo(n.createdAt),
+          isUnread: this.lastSeenNotificationsAt ? new Date(n.createdAt) > new Date(this.lastSeenNotificationsAt) : true,
+        }))
+    },
+    unreadNotificationsCount() {
+      return this.orderNotifications.filter((n) => n.isUnread).length
     },
     cartCount() {
       return this.orders.filter(o => o.status === 'Pendiente').length
@@ -1572,6 +1639,14 @@ export default {
       if (this.revenueLastMonth === 0) return this.revenueThisMonth > 0 ? 100 : 0
       return Math.round(((this.revenueThisMonth - this.revenueLastMonth) / this.revenueLastMonth) * 100)
     },
+    enrichedReviews() {
+      const titleById = {}
+      this.publishedProducts.forEach((p) => { titleById[p.id] = p.title })
+      return this.realReviewsRecords.map((r) => ({
+        ...r,
+        productTitle: titleById[r.product_id] || 'Producto',
+      }))
+    },
     stockoutAlerts() {
       // Velocidad de venta real en los últimos 30 días, por producto
       const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000
@@ -1708,18 +1783,27 @@ export default {
     this.loadSalesData()
     this.loadReviewsData()
     this.loadDismissedOrderIds()
+    this.loadLastSeenNotifications()
     document.addEventListener('click', this.closeProfileMenuOutside)
+    document.addEventListener('click', this.closeNotificationsOutside)
     // Contador de segundos desde la última actualización real del mapa de flota
     // (se reinicia a 0 cada vez que loadActiveDeliveries() trae datos nuevos)
     setInterval(() => {
       this.mapUpdateSeconds = (this.mapUpdateSeconds % 60) + 1
     }, 1000)
+    // Revisa cada 15s si hay ventas nuevas, para que la campana se actualice
+    // sin que la empresa tenga que recargar la página cuando un cliente compra.
+    this.salesPollInterval = setInterval(() => {
+      this.loadSalesData()
+    }, 15000)
   },
 
   beforeUnmount() {
     document.removeEventListener('click', this.closeProfileMenuOutside)
+    document.removeEventListener('click', this.closeNotificationsOutside)
     if (this.conversationsPollInterval) clearInterval(this.conversationsPollInterval)
     if (this.clientChatPollInterval) clearInterval(this.clientChatPollInterval)
+    if (this.salesPollInterval) clearInterval(this.salesPollInterval)
     this.teardownFleetMap()
   },
 
@@ -2088,8 +2172,42 @@ export default {
       }
     },
     toggleNotifications() {
-      this.notifications.forEach(n => n.read = true)
-      alert('📬 Notificaciones: ' + this.notifications.map(n => n.text).join('\n'))
+      this.notificationsOpen = !this.notificationsOpen
+      if (this.notificationsOpen) {
+        // Al abrir el panel, se marcan todas como leídas (guardamos la hora actual)
+        this.lastSeenNotificationsAt = new Date().toISOString()
+        this.saveLastSeenNotifications()
+      }
+    },
+    closeNotificationsOutside(e) {
+      if (!e.target.closest('.notif-bell') && !e.target.closest('.notif-dropdown')) {
+        this.notificationsOpen = false
+      }
+    },
+    loadLastSeenNotifications() {
+      try {
+        this.lastSeenNotificationsAt = localStorage.getItem('unify_last_seen_notifications_at')
+      } catch (e) {
+        this.lastSeenNotificationsAt = null
+      }
+    },
+    saveLastSeenNotifications() {
+      try {
+        localStorage.setItem('unify_last_seen_notifications_at', this.lastSeenNotificationsAt)
+      } catch (e) {
+        console.warn('No se pudo guardar la fecha de notificaciones vistas', e)
+      }
+    },
+    formatTimeAgo(isoDate) {
+      if (!isoDate) return ''
+      const diffMs = Date.now() - new Date(isoDate).getTime()
+      const minutes = Math.floor(diffMs / 60000)
+      if (minutes < 1) return 'Justo ahora'
+      if (minutes < 60) return `Hace ${minutes} min`
+      const hours = Math.floor(minutes / 60)
+      if (hours < 24) return `Hace ${hours} h`
+      const days = Math.floor(hours / 24)
+      return `Hace ${days} día${days === 1 ? '' : 's'}`
     },
     async signOut() {
       try { await insforge.auth.signOut() } catch(e) {}
@@ -2638,6 +2756,68 @@ export default {
   transition: background 0.2s;
   font-size: 1.1rem;
   color: var(--text-mid);
+}
+.notif-wrapper {
+  position: relative;
+}
+.notif-dropdown {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  background: white;
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-md);
+  border: 1px solid var(--border);
+  padding: 0.4rem 0;
+  width: 320px;
+  max-width: 90vw;
+  z-index: 200;
+  animation: slideDown 0.2s ease;
+}
+.notif-dropdown-header {
+  padding: 0.5rem 1rem;
+  font-weight: 600;
+  font-size: 0.85rem;
+  color: var(--text-dark, #1a202c);
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 0.2rem;
+}
+.notif-dropdown-list {
+  max-height: 320px;
+  overflow-y: auto;
+}
+.notif-item {
+  display: flex;
+  gap: 0.7rem;
+  align-items: flex-start;
+  padding: 0.6rem 1rem;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.notif-item:hover { background: var(--green-50); }
+.notif-item-unread { background: var(--off-white); }
+.notif-item-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--green-50);
+  color: var(--green-600);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  font-size: 0.85rem;
+}
+.notif-item-title {
+  font-size: 0.83rem;
+  font-weight: 600;
+  color: var(--text-dark, #1a202c);
+  line-height: 1.3;
+}
+.notif-item-meta {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  margin-top: 0.15rem;
 }
 .notif-bell:hover, .cart-icon:hover { background: var(--green-50); }
 .notif-badge, .cart-badge {
@@ -4149,6 +4329,50 @@ export default {
 }
 .stockout-days.warning { background: #fef3c7; color: #92400e; }
 .stockout-days.critical { background: #fee2e2; color: #dc2626; }
+
+/* ── Reseñas de clientes (Reportes) ── */
+.reviews-panel-list {
+  display: flex;
+  flex-direction: column;
+  max-height: 280px;
+  overflow-y: auto;
+}
+.review-item {
+  padding: 0.6rem 0;
+  border-bottom: 1px solid #edf2f7;
+}
+.review-item:last-child {
+  border-bottom: none;
+}
+.review-item-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+}
+.review-item-name {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-dark, #1a202c);
+}
+.review-item-stars {
+  font-size: 0.8rem;
+  color: #cbd5e0;
+}
+.review-item-stars .star-filled {
+  color: #f6ad55;
+}
+.review-item-product {
+  font-size: 0.75rem;
+  color: var(--sky-600, #0B3C6D);
+  margin-top: 0.1rem;
+}
+.review-item-comment {
+  margin-top: 0.25rem;
+  font-size: 0.83rem;
+  color: var(--text-mid);
+  line-height: 1.4;
+}
 
 
 /* ══════════════════════════════════════════

@@ -4,8 +4,10 @@
          HEADER
     ══════════════════════════════════════════ -->
     <header>
-      <h1><span>U</span>nify</h1>
-      <img src="/img/logo-unify.png" alt="Unify Logo" />
+      <div class="brand">
+        <img src="/img/logo-unify.png" alt="Unify Logo" />
+        <h1><span>U</span>nify</h1>
+      </div>
       <nav class="navbar">
         <ul>
           <li @click="currentView = 'home'" :class="{ active: currentView === 'home' }">
@@ -423,6 +425,21 @@
                   {{ submittingRating ? 'Guardando...' : (hasExistingRating ? 'Actualizar calificación' : 'Enviar calificación') }}
                 </button>
               </div>
+
+              <div class="product-reviews-list">
+                <p class="rate-product-title">Reseñas de clientes</p>
+                <p v-if="loadingProductReviews" class="report-empty-hint">Cargando reseñas...</p>
+                <p v-else-if="!productReviews.length" class="report-empty-hint">Todavía no hay reseñas para este producto. ¡Sé el primero!</p>
+                <div v-else class="review-item" v-for="(r, i) in productReviews" :key="i">
+                  <div class="review-item-header">
+                    <span class="review-item-name">{{ r.client_name || 'Cliente' }}</span>
+                    <span class="review-item-stars">
+                      <span v-for="n in 5" :key="n" :class="{ 'star-filled': n <= r.rating }">★</span>
+                    </span>
+                  </div>
+                  <p v-if="r.comment" class="review-item-comment">{{ r.comment }}</p>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -697,6 +714,8 @@ export default {
       myRatingComment: '',
       submittingRating: false,
       hasExistingRating: false,
+      productReviews: [], // reseñas de TODOS los clientes para el producto abierto
+      loadingProductReviews: false,
     }
   },
 
@@ -1214,6 +1233,7 @@ export default {
       this.selectedProduct = product
       this.detailImageIndex = 0
       this.loadMyReviewForProduct(product.id)
+      this.loadProductReviewsList(product.id)
     },
     closeProductDetail() {
       this.selectedProduct = null
@@ -1304,12 +1324,34 @@ export default {
 
         this.hasExistingRating = true
         await this.loadRealRatingsForProducts()
+        await this.loadProductReviewsList(this.selectedProduct.id)
         alert('¡Gracias por tu calificación!')
       } catch (err) {
         console.warn('Error inesperado guardando calificación:', err)
         alert('Error inesperado guardando tu calificación.')
       } finally {
         this.submittingRating = false
+      }
+    },
+
+    // Carga TODAS las reseñas públicas de un producto (para que cualquier cliente las vea)
+    async loadProductReviewsList(productId) {
+      this.productReviews = []
+      this.loadingProductReviews = true
+      try {
+        const { data, error } = await insforge.database
+          .from('reviews')
+          .select('client_name,rating,comment,created_at')
+          .eq('product_id', productId)
+          .order('created_at', { ascending: false })
+
+        if (!error && data) {
+          this.productReviews = data
+        }
+      } catch (err) {
+        console.warn('Error inesperado cargando reseñas del producto:', err)
+      } finally {
+        this.loadingProductReviews = false
       }
     },
 
@@ -1808,6 +1850,8 @@ export default {
   font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
   background: var(--off-white);
   min-height: 100vh;
+  width: 100%;
+  overflow-x: hidden;
 }
 
 /* ── Header ──────────────────────────────────── */
@@ -1829,7 +1873,6 @@ header h1 {
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
-  margin-left: 40px;
 }
 header h1 span {
   background: linear-gradient(135deg, #0B3C6D 0%, #3A7DBF 100%);
@@ -1837,12 +1880,18 @@ header h1 span {
   background-clip: text;
   color: transparent;
 }
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-shrink: 0;
+}
 header img {
   width: 40px;
   height: 40px;
   border-radius: 12px;
   object-fit: cover;
-  position: absolute;
+  flex-shrink: 0;
 }
 .navbar ul {
   display: flex;
@@ -1926,9 +1975,18 @@ header img {
   align-items: center;
   flex-wrap: wrap;
 }
+.profile-info {
+  min-width: 0;
+}
 .profile-info h2 {
   font-size: 1.8rem;
   margin-bottom: 0.3rem;
+  overflow-wrap: break-word;
+  word-break: break-word;
+}
+.profile-info p {
+  overflow-wrap: break-word;
+  word-break: break-word;
 }
 .profile-points {
   background: rgba(255,255,255,0.2);
@@ -2579,6 +2637,48 @@ header img {
   margin-bottom: 0.6rem;
   box-sizing: border-box;
 }
+.product-reviews-list {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid #e2e8f0;
+  max-height: 260px;
+  overflow-y: auto;
+}
+.report-empty-hint {
+  font-size: 0.82rem;
+  color: var(--text-muted);
+}
+.review-item {
+  padding: 0.6rem 0;
+  border-bottom: 1px solid #edf2f7;
+}
+.review-item:last-child {
+  border-bottom: none;
+}
+.review-item-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+}
+.review-item-name {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-dark, #1a202c);
+}
+.review-item-stars {
+  font-size: 0.8rem;
+  color: #cbd5e0;
+}
+.review-item-stars .star-filled {
+  color: #f6ad55;
+}
+.review-item-comment {
+  margin-top: 0.25rem;
+  font-size: 0.83rem;
+  color: var(--text-mid);
+  line-height: 1.4;
+}
 .detail-price {
   font-size: 1.8rem;
   font-weight: 700;
@@ -2766,30 +2866,6 @@ header img {
   margin-top: 0;
   color: var(--text-dark);
 }
-.driver-share-link {
-  margin-top: 0.9rem;
-  padding-top: 0.9rem;
-  border-top: 1px dashed var(--border);
-}
-.share-link-label {
-  font-size: 0.8rem;
-  color: var(--text-muted);
-  margin-bottom: 0.4rem;
-}
-.share-link-row {
-  display: flex;
-  gap: 0.4rem;
-}
-.share-link-row input {
-  flex: 1;
-  min-width: 0;
-  padding: 0.5rem 0.7rem;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  font-size: 0.78rem;
-  color: var(--text-muted);
-  background: #f7fafc;
-}
 .tracking-map-panel .card-panel {
   height: 100%;
 }
@@ -2953,14 +3029,31 @@ footer {
 @media (max-width: 768px) {
   .products-grid { grid-template-columns: 1fr; }
   .profile-header { flex-direction: column; text-align: center; gap: 1rem; }
-  header { flex-wrap: wrap; gap: 0.5rem; }
-  .navbar ul { gap: 0.25rem; }
+  header { flex-wrap: wrap; gap: 0.5rem; padding: 0.75rem 4vw; }
+  .navbar ul { flex-wrap: wrap; justify-content: center; gap: 0.35rem; }
   .navbar li { padding: 0.3rem 0.6rem; font-size: 0.8rem; }
   .order-item { flex-direction: column; align-items: stretch; gap: 0.5rem; }
   .order-info { justify-content: center; }
+  .cart-item { flex-direction: column; align-items: stretch; gap: 0.6rem; }
+  .cart-item-actions { justify-content: space-between; flex-wrap: wrap; }
   .catalog-search-bar { flex-direction: column; }
   .catalog-filters { width: 100%; }
   .catalog-filters .sel { flex: 1; }
   .tracking-layout { grid-template-columns: 1fr; }
+}
+@media (max-width: 480px) {
+  header { padding: 0.6rem 4vw; }
+  header h1 { font-size: 1.4rem; }
+  header img { width: 32px; height: 32px; }
+  .navbar li {
+    padding: 0.28rem 0.5rem;
+    font-size: 0.72rem;
+    gap: 0.3rem;
+  }
+  .navbar li i { font-size: 0.85rem; }
+  .modal-content {
+    width: 94vw;
+    padding: 1.2rem;
+  }
 }
 </style>

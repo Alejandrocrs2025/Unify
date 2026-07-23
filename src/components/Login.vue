@@ -276,6 +276,8 @@ onMounted(async () => {
 
 .login-page {
   min-height: 100vh;
+  width: 100%;
+  overflow-x: hidden;
   display: flex;
   flex-direction: column;
   font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -377,6 +379,7 @@ main {
   justify-content: center;
   align-items: center;
   padding: 2rem;
+  width: 100%;
 }
 
 .login-card {
@@ -459,6 +462,13 @@ main {
   justify-content: center;
   width: 24px;
   height: 24px;
+  flex-shrink: 0;
+}
+
+.oauth-btn .icon svg {
+  width: 100%;
+  height: 100%;
+  display: block;
 }
 
 .oauth-divider {
@@ -535,6 +545,10 @@ main {
   position: relative;
 }
 
+.password-wrapper .input-field {
+  padding-right: 4.2rem;
+}
+
 .toggle-password {
   position: absolute;
   right: 12px;
@@ -545,6 +559,7 @@ main {
   user-select: none;
   font-size: 0.95rem;
   transition: color 0.3s ease;
+  white-space: nowrap;
 }
 
 .toggle-password:hover {
@@ -705,16 +720,23 @@ main {
 @media (max-width: 768px) {
   .login-header {
     flex-direction: column;
-    gap: 1rem;
+    gap: 0.75rem;
     padding: 1rem;
+  }
+
+  .brand h1 {
+    font-size: 1.6rem;
   }
 
   .navbar .list {
     gap: 1rem;
   }
 
+  main {
+    padding: 1.25rem;
+  }
+
   .login-card {
-    margin: 1rem;
     padding: 1.5rem;
   }
 
@@ -724,13 +746,41 @@ main {
 }
 
 @media (max-width: 480px) {
+  .login-header {
+    padding: 0.75rem;
+  }
+
+  .brand img {
+    width: 34px;
+    height: 34px;
+  }
+
+  .brand h1 {
+    font-size: 1.4rem;
+  }
+
   .navbar .list {
     flex-wrap: wrap;
     justify-content: center;
+    gap: 0.75rem 1.25rem;
+  }
+
+  main {
+    padding: 0.75rem;
   }
 
   .login-card {
-    padding: 1rem;
+    padding: 1.25rem;
+    border-radius: 16px;
+  }
+
+  .oauth-btn {
+    padding: 0.75rem 0.85rem;
+    font-size: 0.92rem;
+  }
+
+  .info-modal {
+    padding: 1.5rem;
   }
 }
 </style>

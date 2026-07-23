@@ -89,6 +89,9 @@ const skipForNow = () => {
   // Permite avanzar y completar los datos después, sin bloquear al usuario.
   emit('switch-view', 'empresa')
 }
+
+const showHowItWorks = ref(false)
+const showHelp = ref(false)
 </script>
 
 <template>
@@ -98,7 +101,35 @@ const skipForNow = () => {
         <img src="/img/logo-unify.png" alt="Logo de Unify" />
         <h1><span>U</span>nify</h1>
       </div>
+      <nav class="navbar" aria-label="Navegación principal">
+        <ul class="list">
+          <li tabindex="0" @click="showHowItWorks = true" @keydown.enter.prevent="showHowItWorks = true">¿Cómo funciona?</li>
+          <li tabindex="0" @click="showHelp = true" @keydown.enter.prevent="showHelp = true">Ayuda</li>
+        </ul>
+      </nav>
     </header>
+
+    <!-- Modal: ¿Cómo funciona? -->
+    <div class="info-modal-overlay" v-if="showHowItWorks" @click.self="showHowItWorks = false">
+      <div class="info-modal">
+        <button class="info-modal-close" @click="showHowItWorks = false" aria-label="Cerrar">&times;</button>
+        <h3>¿Cómo funciona Unify?</h3>
+        <ul class="info-modal-list">
+          <li><strong>Como Cliente:</strong> explora catálogos por empresa, compra productos y rastrea tu pedido en tiempo real en el mapa.</li>
+          <li><strong>Como Empresa:</strong> publica tu catálogo, gestiona inventario y pedidos, y chatea directo con tus clientes.</li>
+          <li>Estos datos de tu empresa aparecerán en tu perfil de vendedor; puedes editarlos después cuando quieras.</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- Modal: Ayuda -->
+    <div class="info-modal-overlay" v-if="showHelp" @click.self="showHelp = false">
+      <div class="info-modal">
+        <button class="info-modal-close" @click="showHelp = false" aria-label="Cerrar">&times;</button>
+        <h3>¿Necesitas ayuda?</h3>
+        <p>Si tienes problemas para completar los datos de tu empresa, escríbenos a <a href="mailto:soporte@unify.com">soporte@unify.com</a> y con gusto te ayudamos.</p>
+      </div>
+    </div>
 
     <main>
       <article class="details-card">
@@ -202,7 +233,14 @@ const skipForNow = () => {
   background: rgba(255, 255, 255, 0.95);
   backdrop-filter: blur(10px);
   padding: 1rem 2rem;
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
   box-shadow: 0 2px 20px rgba(0, 0, 0, 0.1);
+  position: sticky;
+  top: 0;
+  z-index: 100;
 }
 
 .brand {
@@ -225,6 +263,125 @@ const skipForNow = () => {
 
 .brand h1 span {
   color: #0b3c6d;
+}
+
+.navbar {
+  display: flex;
+  align-items: center;
+}
+
+.navbar .list {
+  display: flex;
+  gap: 2rem;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.navbar .list li {
+  color: #4a5568;
+  cursor: pointer;
+  font-weight: 500;
+  transition: color 0.3s ease;
+  position: relative;
+}
+
+.navbar .list li:hover {
+  color: #005e59;
+}
+
+.navbar .list li::after {
+  content: '';
+  position: absolute;
+  width: 0;
+  height: 2px;
+  bottom: -5px;
+  left: 0;
+  background: linear-gradient(135deg, #005e59 0%, #013d4f 100%);
+  transition: width 0.3s ease;
+}
+
+.navbar .list li:hover::after {
+  width: 100%;
+}
+
+.info-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(11, 60, 109, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 200;
+  padding: 1rem;
+}
+
+.info-modal {
+  background: white;
+  border-radius: 16px;
+  padding: 2rem;
+  max-width: 460px;
+  width: 100%;
+  position: relative;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
+  animation: fadeInUp 0.3s ease;
+}
+
+.info-modal h3 {
+  color: #005e59;
+  margin-bottom: 1rem;
+  font-size: 1.3rem;
+}
+
+.info-modal p {
+  color: #4a5568;
+  line-height: 1.6;
+}
+
+.info-modal p a {
+  color: #005e59;
+  font-weight: 600;
+}
+
+.info-modal-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+
+.info-modal-list li {
+  color: #4a5568;
+  line-height: 1.5;
+  font-size: 0.95rem;
+}
+
+.info-modal-list li strong {
+  color: #005e59;
+}
+
+.info-modal-close {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  background: none;
+  border: none;
+  font-size: 1.5rem;
+  line-height: 1;
+  cursor: pointer;
+  color: #a0aec0;
+  transition: color 0.2s ease;
+}
+
+.info-modal-close:hover {
+  color: #005e59;
+}
+
+@media (max-width: 768px) {
+  .company-header {
+    flex-direction: column;
+    gap: 1rem;
+    padding: 1rem;
+  }
 }
 
 main {
