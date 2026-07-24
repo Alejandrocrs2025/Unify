@@ -1,5 +1,5 @@
 <template>
-  <div>
+  <div class="home-page">
     <div class="hero-blob"></div>
     <div class="hero-blob2"></div>
 
@@ -461,6 +461,10 @@ onBeforeUnmount(() => {
 
 <style scoped>
 /* ─── VARIABLES (ahora en style.css global — aquí solo se consumen) ─── */
+.home-page {
+  width: 100%;
+  overflow-x: hidden;
+}
 
 /* ─── UTILIDADES ─────────────────────────────────────────── */
 .container { max-width: 1180px; margin: 0 auto; padding: 0 5vw; }
@@ -603,6 +607,7 @@ h3 { font-size: 1.25rem; font-weight: 600; }
   display: flex; 
   gap: .75rem; 
   align-items: center; 
+  margin-left: auto;
 }
 
 /* ─── HERO ────────────────────────────────────────────────── */
@@ -893,7 +898,7 @@ h3 { font-size: 1.25rem; font-weight: 600; }
   padding-top: 1.8rem; flex-wrap: wrap; gap: 1rem;
 }
 .footer-copy  { font-size: .8rem; color: var(--text-muted); }
-.footer-legal { display: flex; gap: 1.5rem; }
+.footer-legal { display: flex; gap: 1.5rem; flex-wrap: wrap; }
 .footer-legal a { font-size: .8rem; color: var(--text-muted); transition: color .2s; }
 .footer-legal a:hover { color: var(--green-600); }
 

@@ -219,24 +219,26 @@
                 @click="activeFilter = f"
               >{{ f }}</button>
             </div>
-            <table class="order-table">
-              <thead>
-                <tr><th>ID</th><th>Cliente</th><th>Total</th><th>Estado</th><th></th></tr>
-              </thead>
-              <tbody>
-                <tr v-for="order in filteredOrders" :key="order.id">
-                  <td class="order-id">{{ order.id }}</td>
-                  <td>{{ order.client }}</td>
-                  <td class="order-total">{{ order.total }}</td>
-                  <td><span class="status-badge" :class="getOrderStatusClass(order.status)">{{ order.status }}</span></td>
-                  <td>
-                    <button class="btn btn-outline btn-sm" @click="viewOrder(order)">
-                      <i class="fas fa-eye"></i>
-                    </button>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
+            <div class="table-scroll">
+              <table class="order-table">
+                <thead>
+                  <tr><th>ID</th><th>Cliente</th><th>Total</th><th>Estado</th><th></th></tr>
+                </thead>
+                <tbody>
+                  <tr v-for="order in filteredOrders" :key="order.id">
+                    <td class="order-id">{{ order.id }}</td>
+                    <td>{{ order.client }}</td>
+                    <td class="order-total">{{ order.total }}</td>
+                    <td><span class="status-badge" :class="getOrderStatusClass(order.status)">{{ order.status }}</span></td>
+                    <td>
+                      <button class="btn btn-outline btn-sm" @click="viewOrder(order)">
+                        <i class="fas fa-eye"></i>
+                      </button>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
           </div>
 
           <!-- Ventas semanales -->
@@ -647,29 +649,31 @@
               <h3><i class="fas fa-shipping-fast"></i> Seguimiento de envíos activos</h3>
               <span class="panel-badge">{{ activeShipments }} activos ahora</span>
             </div>
-            <table class="order-table">
-              <thead>
-                <tr><th>Envío</th><th>Producto</th><th>Cliente</th><th>Conductor</th><th>ETA</th><th>Estado</th><th>Acciones</th></tr>
-              </thead>
-              <tbody>
-                <tr v-for="s in activeShipmentsList" :key="s.id">
-                  <td class="order-id">{{ s.id }}</td>
-                  <td>{{ s.product }}</td>
-                  <td>{{ s.client }}</td>
-                  <td>
-                    <span class="driver-mini">
-                      <div class="driver-mini-avatar">{{ s.driverInitials }}</div> {{ s.driver }}
-                    </span>
-                  </td>
-                  <td><span class="eta-pill">🕐 {{ s.eta }}</span></td>
-                  <td><span class="status-badge" :class="getOrderStatusClass(s.status)">{{ s.status }}</span></td>
-                  <td>
-                    <button class="btn btn-outline btn-sm" @click="viewTracking(s)"><i class="fas fa-map-marker-alt"></i></button>
-                    <button class="btn btn-outline btn-sm ml-xs" @click="openChat(s)"><i class="fas fa-comment"></i></button>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
+            <div class="table-scroll">
+              <table class="order-table">
+                <thead>
+                  <tr><th>Envío</th><th>Producto</th><th>Cliente</th><th>Conductor</th><th>ETA</th><th>Estado</th><th>Acciones</th></tr>
+                </thead>
+                <tbody>
+                  <tr v-for="s in activeShipmentsList" :key="s.id">
+                    <td class="order-id">{{ s.id }}</td>
+                    <td>{{ s.product }}</td>
+                    <td>{{ s.client }}</td>
+                    <td>
+                      <span class="driver-mini">
+                        <div class="driver-mini-avatar">{{ s.driverInitials }}</div> {{ s.driver }}
+                      </span>
+                    </td>
+                    <td><span class="eta-pill">🕐 {{ s.eta }}</span></td>
+                    <td><span class="status-badge" :class="getOrderStatusClass(s.status)">{{ s.status }}</span></td>
+                    <td>
+                      <button class="btn btn-outline btn-sm" @click="viewTracking(s)"><i class="fas fa-map-marker-alt"></i></button>
+                      <button class="btn btn-outline btn-sm ml-xs" @click="openChat(s)"><i class="fas fa-comment"></i></button>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
           </div>
         </template>
       </template>
@@ -704,7 +708,8 @@
         </div>
 
         <div class="card-panel">
-          <table class="order-table">
+          <div class="table-scroll">
+            <table class="order-table">
             <thead>
               <tr>
                 <th>ID</th>
@@ -737,7 +742,8 @@
                 </td>
               </tr>
             </tbody>
-          </table>
+            </table>
+          </div>
         </div>
       </template>
 
@@ -776,37 +782,39 @@
               <i class="fas fa-plus"></i> Agregar producto
             </button>
           </div>
-          <table class="order-table">
-            <thead>
-              <tr><th>Producto</th><th>Categoría</th><th>Stock</th><th>Precio</th><th>Estado</th><th>Acciones</th></tr>
-            </thead>
-            <tbody>
-              <tr v-for="p in publishedProducts" :key="p.id">
-                <td>
-                  <div class="product-cell">
-                    <img :src="p.image" alt="" class="product-thumb" @error="$event.target.src='https://via.placeholder.com/40/edf7f5/005e59?text=?'" />
-                    <span>{{ p.title }}</span>
-                  </div>
-                </td>
-                <td>{{ p.category }}</td>
-                <td>
-                  <span :class="p.stock === 0 ? 'stock-critical' : p.stock <= 5 ? 'stock-low' : ''">
-                    {{ p.stock }} uds
-                  </span>
-                </td>
-                <td>${{ p.price.toFixed(2) }}</td>
-                <td><span class="status-badge" :class="'pstatus-' + p.status.toLowerCase()">{{ p.status }}</span></td>
-                <td>
-                  <button class="btn btn-outline btn-sm" @click="editProduct(p)">
-                    <i class="fas fa-edit"></i>
-                  </button>
-                  <button class="btn btn-outline btn-sm" @click="restock(p)">
-                    <i class="fas fa-plus"></i>
-                  </button>
-                </td>
-              </tr>
-            </tbody>
-          </table>
+          <div class="table-scroll">
+            <table class="order-table">
+              <thead>
+                <tr><th>Producto</th><th>Categoría</th><th>Stock</th><th>Precio</th><th>Estado</th><th>Acciones</th></tr>
+              </thead>
+              <tbody>
+                <tr v-for="p in publishedProducts" :key="p.id">
+                  <td>
+                    <div class="product-cell">
+                      <img :src="p.image" alt="" class="product-thumb" @error="$event.target.src='https://via.placeholder.com/40/edf7f5/005e59?text=?'" />
+                      <span>{{ p.title }}</span>
+                    </div>
+                  </td>
+                  <td>{{ p.category }}</td>
+                  <td>
+                    <span :class="p.stock === 0 ? 'stock-critical' : p.stock <= 5 ? 'stock-low' : ''">
+                      {{ p.stock }} uds
+                    </span>
+                  </td>
+                  <td>${{ p.price.toFixed(2) }}</td>
+                  <td><span class="status-badge" :class="'pstatus-' + p.status.toLowerCase()">{{ p.status }}</span></td>
+                  <td>
+                    <button class="btn btn-outline btn-sm" @click="editProduct(p)">
+                      <i class="fas fa-edit"></i>
+                    </button>
+                    <button class="btn btn-outline btn-sm" @click="restock(p)">
+                      <i class="fas fa-plus"></i>
+                    </button>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
         </div>
       </template>
 
@@ -2611,7 +2619,6 @@ export default {
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
-  margin-left: 40px;
 }
 .market-header h1 span { 
   background: linear-gradient(135deg, #0B3C6D 0%, #3A7DBF 100%);
@@ -2763,7 +2770,7 @@ export default {
 .notif-dropdown {
   position: absolute;
   top: calc(100% + 8px);
-  left: 0;
+  right: 0;
   background: white;
   border-radius: var(--radius-md);
   box-shadow: var(--shadow-md);
@@ -3264,8 +3271,14 @@ export default {
   color: white;
   border-color: var(--sky-600);
 }
+.table-scroll {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
 .order-table {
   width: 100%;
+  min-width: 560px;
   border-collapse: collapse;
   font-size: 0.88rem;
 }
@@ -4793,6 +4806,9 @@ footer {
   .publish-actions { flex-direction: column; align-items: stretch; }
   .messages-layout { grid-template-columns: 1fr; }
   .conversations-list { max-height: 200px; overflow-y: auto; }
+  .tracking-order-item { flex-direction: column; align-items: stretch; gap: 0.6rem; }
+  .product-item { flex-wrap: wrap; }
+  .product-item .driver-right { align-items: flex-start; flex-direction: row; flex-wrap: wrap; }
 }
 @media (max-width: 480px) {
   .stats-grid { grid-template-columns: 1fr 1fr; }

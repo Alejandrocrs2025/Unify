@@ -260,8 +260,8 @@ Responde de forma breve, concreta y accionable.`,
 <style scoped>
 .ubot-root {
   position: fixed;
-  right: 1.5rem;
-  bottom: 1.5rem;
+  right: max(1.5rem, env(safe-area-inset-right));
+  bottom: max(1.5rem, env(safe-area-inset-bottom));
   z-index: 9999;
   font-family: inherit;
 }
@@ -517,7 +517,7 @@ Responde de forma breve, concreta y accionable.`,
 
 /* ── Responsive ───────────────────────────────── */
 @media (max-width: 480px) {
-  .ubot-root { right: 1rem; bottom: 1rem; }
+  .ubot-root { right: max(1rem, env(safe-area-inset-right)); bottom: max(1rem, env(safe-area-inset-bottom)); }
   .ubot-panel { width: calc(100vw - 2rem); height: 65vh; }
 }
 </style>

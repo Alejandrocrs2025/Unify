@@ -1,8 +1,10 @@
 <template>
   <div class="page">
     <header class="main-header">
-      <h1><span>U</span>nify</h1>
-      <img src="/img/logo-unify.png" alt="Logo Unify" class="main-logo" />
+      <div class="brand">
+        <img src="/img/logo-unify.png" alt="Logo Unify" class="main-logo" />
+        <h1><span>U</span>nify</h1>
+      </div>
 
       <nav class="navbar" aria-label="Navegación principal">
         <ul class="list">
@@ -115,6 +117,8 @@ const selectRole = async (role) => {
 <style scoped>
 .page {
   min-height: 100vh;
+  width: 100%;
+  overflow-x: hidden;
   display: flex;
   flex-direction: column;
   margin: 0;
@@ -137,12 +141,10 @@ const selectRole = async (role) => {
 .main-header h1 {
   font-size: 2rem;
   font-weight: 700;
-  margin-left: 25px;
   background: linear-gradient(135deg, #005e59 0%, #00ab91 100%);
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
-  margin-left: 40px;
 }
 
 .main-header h1 span {
@@ -153,11 +155,18 @@ const selectRole = async (role) => {
 }
 
 /* Logo */
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-shrink: 0;
+}
+
 .main-logo {
   width: 40px;
   height: 40px;
   border-radius: 25px;
-  position: absolute;
+  flex-shrink: 0;
 }
 
 /* Navbar */

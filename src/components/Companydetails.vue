@@ -224,6 +224,8 @@ const showHelp = ref(false)
 .company-details-page {
   font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
   min-height: 100vh;
+  width: 100%;
+  overflow-x: hidden;
   display: flex;
   flex-direction: column;
   background: linear-gradient(135deg, #005e59 0%, #00b0a8 100%);
@@ -381,6 +383,38 @@ const showHelp = ref(false)
     flex-direction: column;
     gap: 1rem;
     padding: 1rem;
+  }
+  main {
+    padding: 1.25rem;
+  }
+  .details-card {
+    padding: 1.5rem;
+  }
+  .form-row {
+    flex-direction: column;
+    gap: 0;
+  }
+}
+
+@media (max-width: 480px) {
+  .brand img {
+    width: 34px;
+    height: 34px;
+  }
+  .brand h1 {
+    font-size: 1.4rem;
+  }
+  main {
+    padding: 0.75rem;
+  }
+  .details-card {
+    padding: 1.2rem;
+  }
+  .details-card h2 {
+    font-size: 1.35rem;
+  }
+  .info-modal {
+    padding: 1.5rem;
   }
 }
 

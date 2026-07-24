@@ -300,6 +300,8 @@ export default {
 <style scoped>
 .repartidor-page {
   min-height: 100vh;
+  width: 100%;
+  overflow-x: hidden;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -429,6 +431,8 @@ h1 {
   padding: 0.3rem 0.8rem;
   font-size: 0.8rem;
   margin: 0.15rem 0.3rem 0.15rem 0;
+  max-width: 100%;
+  overflow-wrap: break-word;
 }
 
 .repartidor-chat {
@@ -501,5 +505,14 @@ h1 {
 .chat-send-btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+@media (max-width: 360px) {
+  .repartidor-page {
+    padding: 0.9rem;
+  }
+  .repartidor-card {
+    padding: 1.4rem;
+  }
 }
 </style>
