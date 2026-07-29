@@ -151,8 +151,8 @@ const goToLogin = () => {
   <div class="register-page">
     <header class="register-header">
       <div class="brand">
-        <h1><span>U</span>nify</h1>
         <img src="/img/logo-unify.png" alt="Unify logo" class="register-logo" />
+        <h1><span>U</span>nify</h1>
       </div>
       <nav class="navbar" aria-label="Navegación principal">
         <ul class="list">
@@ -339,6 +339,8 @@ const goToLogin = () => {
   font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
   background: linear-gradient(135deg, var(--bg-start) 0%, var(--bg-end) 100%);
   min-height: 100vh;
+  width: 100%;
+  overflow-x: hidden;
   display: flex;
   flex-direction: column;
 }
@@ -354,13 +356,18 @@ const goToLogin = () => {
   box-shadow: 0 2px 20px rgba(0, 0, 0, 0.1);
 }
 
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-shrink: 0;
+}
+
 .register-logo {
   width: 40px;
   height: 40px;
   border-radius: 25px;
-  position: fixed;
-  top: 2rem;
-  left: 2rem;
+  flex-shrink: 0;
 }
 
 .register-header h1 {
@@ -509,6 +516,13 @@ const goToLogin = () => {
   justify-content: center;
   width: 24px;
   height: 24px;
+  flex-shrink: 0;
+}
+
+.oauth-btn .icon svg {
+  width: 100%;
+  height: 100%;
+  display: block;
 }
 
 .oauth-divider {
@@ -799,7 +813,7 @@ const goToLogin = () => {
 @media (max-width: 768px) {
   .register-header {
     flex-direction: column;
-    gap: 1rem;
+    gap: 0.75rem;
     padding: 1rem;
   }
 
@@ -807,29 +821,51 @@ const goToLogin = () => {
     gap: 1rem;
   }
 
+  .register-main {
+    padding: 1.25rem;
+  }
+
   .login-card {
-    margin: 1rem;
     padding: 1.5rem;
   }
 
   .login-form h2 {
     font-size: 1.5rem;
   }
-}
-
-@media (max-width: 480px) {
-  .navbar .list {
-    flex-wrap: wrap;
-    justify-content: center;
-  }
-
-  .login-card {
-    padding: 1rem;
-  }
 
   .form-row {
     flex-direction: column;
     gap: 0;
+  }
+}
+
+@media (max-width: 480px) {
+  .register-header {
+    padding: 0.75rem;
+  }
+
+  .navbar .list {
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 0.75rem 1.25rem;
+  }
+
+  .register-main {
+    padding: 0.75rem;
+  }
+
+  .login-card {
+    padding: 1.25rem;
+    border-radius: 16px;
+  }
+
+  .oauth-btn {
+    padding: 0.75rem 0.85rem;
+    font-size: 0.92rem;
+  }
+
+  .info-modal {
+    padding: 1.5rem;
   }
 }
 </style>
