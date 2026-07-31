@@ -6,7 +6,6 @@ import Register from './components/Register.vue'
 import Main from './components/Main.vue'
 import Cliente from './components/Cliente.vue'
 import Empresa from './components/Empresa.vue'
-import Pedidos from './components/Pedidos.vue'
 import CompanyDetails from './components/CompanyDetails.vue'
 import Repartidor from './components/Repartidor.vue'
 import { checkSessionAndGetView } from './authHelpers.js'
@@ -25,7 +24,6 @@ const components = {
   main: Main,
   cliente: Cliente,
   empresa: Empresa,
-  pedidos: Pedidos,
   'empresa-details': CompanyDetails,
 }
 const switchView = (view) => {

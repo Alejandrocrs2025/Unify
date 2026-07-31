@@ -298,7 +298,28 @@
               <input type="file" accept="image/*" @change="uploadAvatar" hidden />
             </label>
           </div>
-          <h3>{{ userName }}</h3>
+          <div class="profile-name-row" v-if="!editingName">
+            <h3>{{ userName }}</h3>
+            <button class="edit-name-btn" title="Editar nombre" @click="startEditName">
+              <i class="fas fa-pencil-alt"></i>
+            </button>
+          </div>
+          <div class="profile-name-edit" v-else>
+            <input
+              type="text"
+              class="name-edit-input"
+              v-model="nameDraft"
+              maxlength="60"
+              placeholder="Tu nombre completo"
+              @keyup.enter="saveName"
+            />
+            <button class="btn btn-primary btn-sm" :disabled="savingName" @click="saveName">
+              <i class="fas fa-check"></i>
+            </button>
+            <button class="btn btn-outline btn-sm" @click="cancelEditName">
+              <i class="fas fa-times"></i>
+            </button>
+          </div>
           <p class="profile-email">{{ userEmail }}</p>
           <p class="profile-role">Rol: {{ userRole }}</p>
           <p class="profile-points-display">⭐ {{ userPoints }} puntos acumulados</p>
@@ -306,7 +327,70 @@
             <i class="fas fa-sign-out-alt"></i> Cerrar sesión
           </button>
         </div>
+
+        <div class="addresses-card">
+          <div class="panel-header">
+            <h3><i class="fas fa-map-marker-alt"></i> Mis direcciones</h3>
+            <button class="btn btn-primary btn-sm" @click="openAddressForm(null)">
+              <i class="fas fa-plus"></i> Nueva
+            </button>
+          </div>
+          <div v-if="addresses.length" class="addresses-list">
+            <div v-for="a in addresses" :key="a.id" class="address-row">
+              <div class="address-row-info">
+                <div class="address-row-label">
+                  {{ a.label }}
+                  <span v-if="a.is_default" class="address-default-tag">Predeterminada</span>
+                </div>
+                <div class="address-row-detail">{{ a.street }}, {{ a.city }}</div>
+                <div v-if="a.reference" class="address-row-ref">{{ a.reference }}</div>
+              </div>
+              <div class="address-row-actions">
+                <button class="btn btn-outline btn-sm" v-if="!a.is_default" @click="setDefaultAddress(a)" title="Marcar como predeterminada">
+                  <i class="fas fa-star"></i>
+                </button>
+                <button class="btn btn-outline btn-sm" @click="openAddressForm(a)" title="Editar">
+                  <i class="fas fa-edit"></i>
+                </button>
+                <button class="btn btn-outline btn-sm" @click="deleteAddress(a)" title="Eliminar">
+                  <i class="fas fa-trash"></i>
+                </button>
+              </div>
+            </div>
+          </div>
+          <p v-else class="report-empty-hint">Todavía no tienes direcciones guardadas.</p>
+        </div>
       </template>
+
+      <!-- Modal: agregar/editar dirección -->
+      <div class="modal-overlay" v-if="showAddressModal" @click.self="closeAddressForm">
+        <div class="modal-content">
+          <button class="modal-close" @click="closeAddressForm">&times;</button>
+          <h2>{{ editingAddressId ? 'Editar dirección' : 'Nueva dirección' }}</h2>
+          <div class="form-group">
+            <label>Etiqueta</label>
+            <input type="text" class="form-input" v-model="addressDraft.label" placeholder="Casa, Trabajo..." maxlength="30" />
+          </div>
+          <div class="form-group">
+            <label>Calle y número</label>
+            <input type="text" class="form-input" v-model="addressDraft.street" placeholder="Calle, número, colonia..." maxlength="120" />
+          </div>
+          <div class="form-group">
+            <label>Ciudad</label>
+            <input type="text" class="form-input" v-model="addressDraft.city" placeholder="Ciudad" maxlength="60" />
+          </div>
+          <div class="form-group">
+            <label>Referencia (opcional)</label>
+            <input type="text" class="form-input" v-model="addressDraft.reference" placeholder="Color de casa, punto de referencia..." maxlength="120" />
+          </div>
+          <label class="address-default-checkbox">
+            <input type="checkbox" v-model="addressDraft.is_default" /> Usar como dirección predeterminada
+          </label>
+          <button class="btn-primary" style="width:100%; margin-top: 1rem;" :disabled="savingAddress || !addressDraft.label || !addressDraft.street || !addressDraft.city" @click="saveAddress">
+            {{ savingAddress ? 'Guardando...' : 'Guardar dirección' }}
+          </button>
+        </div>
+      </div>
 
       <!-- ════════════════════════════════════════
            CARRITO DE COMPRAS (visible siempre)
@@ -502,6 +586,28 @@
             <p class="checkout-total-final">Total con descuento: <strong>${{ finalCheckoutTotal.toFixed(2) }}</strong></p>
           </div>
 
+          <div class="address-select-box">
+            <p class="rate-product-title">Dirección de entrega</p>
+            <div v-if="addresses.length" class="address-option-list">
+              <label
+                v-for="a in addresses"
+                :key="a.id"
+                class="address-option"
+                :class="{ active: selectedAddressId === a.id }"
+              >
+                <input type="radio" name="deliveryAddress" :value="a.id" v-model="selectedAddressId" />
+                <span>
+                  <strong>{{ a.label }}</strong> — {{ a.street }}, {{ a.city }}
+                  <span v-if="a.is_default" class="address-default-tag">Predeterminada</span>
+                </span>
+              </label>
+            </div>
+            <p v-else class="report-empty-hint">No tienes direcciones guardadas todavía.</p>
+            <button class="btn btn-outline btn-sm" style="margin-top: 0.5rem;" @click="goManageAddresses">
+              <i class="fas fa-map-marker-alt"></i> {{ addresses.length ? 'Gestionar direcciones' : 'Agregar una dirección' }}
+            </button>
+          </div>
+
           <div class="payment-methods">
             <div class="payment-method" @click="selectPaymentMethod('card')" :class="{ active: selectedPayment === 'card' }">
               <i class="fas fa-credit-card"></i> Tarjeta de crédito/débito
@@ -534,7 +640,7 @@
             <p>Pagarás en efectivo directamente al repartidor cuando recibas tu pedido.</p>
             <p>Ten el monto exacto listo: <strong>${{ finalCheckoutTotal.toFixed(2) }}</strong></p>
           </div>
-          <button class="btn-primary" style="width: 100%; margin-top: 1rem;" @click="confirmPayment" :disabled="!selectedPayment">
+          <button class="btn-primary" style="width: 100%; margin-top: 1rem;" @click="confirmPayment" :disabled="!selectedPayment || (addresses.length > 0 && !selectedAddressId)">
             Confirmar pago
           </button>
         </div>
@@ -556,6 +662,7 @@
               <p><strong>Fecha:</strong> {{ orderDetailMeta.date }}</p>
               <p><strong>Estado:</strong> <span :class="getStatusClass(orderDetailMeta.status)">{{ orderDetailMeta.status }}</span></p>
               <p><strong>Forma de pago:</strong> {{ paymentMethodLabel(orderDetailMeta.paymentMethod) }}</p>
+              <p v-if="orderDetailMeta.deliveryAddress"><strong>Dirección de entrega:</strong> {{ orderDetailMeta.deliveryAddress }}</p>
               <p><strong>Total:</strong> ${{ orderDetailMeta.total.toFixed(2) }}</p>
             </div>
 
@@ -614,6 +721,17 @@ export default {
       userEmail: 'cliente@email.com',
       userRole: 'Cliente',
       userPoints: 0,
+      editingName: false,
+      nameDraft: '',
+      savingName: false,
+
+      // ─── Direcciones ───────────────────────────
+      addresses: [],
+      selectedAddressId: null,
+      showAddressModal: false,
+      editingAddressId: null,
+      addressDraft: { label: '', street: '', city: '', reference: '', is_default: false },
+      savingAddress: false,
       pointsToRedeem: 0, // en bloques de 100
       currentUserId: null,
 
@@ -682,7 +800,7 @@ export default {
       showOrderDetailModal: false,
       orderDetailLoading: false,
       orderDetailProducts: [],
-      orderDetailMeta: { id: '', date: '', status: '', paymentMethod: null, total: 0 },
+      orderDetailMeta: { id: '', date: '', status: '', paymentMethod: null, total: 0, deliveryAddress: null },
 
       // ─── Seguimiento (tracking) ──────────────
       trackingOrderId: null,
@@ -850,14 +968,161 @@ export default {
         this.currentUserId = user.id || null
 
         if (this.currentUserId) {
-          const profileRes = await insforge.database.from('profiles').select('points, avatar_url').eq('id', this.currentUserId).single()
+          const profileRes = await insforge.database.from('profiles').select('points, avatar_url, full_name').eq('id', this.currentUserId).single()
           if (!profileRes?.error) {
             if (typeof profileRes?.data?.points === 'number') this.userPoints = profileRes.data.points
             if (profileRes?.data?.avatar_url) this.avatarUrl = profileRes.data.avatar_url
+            // El nombre guardado en `profiles` es la fuente más confiable — los metadatos
+            // de auth (user_metadata.full_name) no siempre quedan bien guardados según el
+            // flujo de registro usado, así que si aquí hay un nombre, tiene prioridad.
+            if (profileRes?.data?.full_name) this.userName = profileRes.data.full_name
           }
+          await this.loadAddresses()
         }
       } catch (err) {
         console.warn('Error cargando perfil de cliente:', err)
+      }
+    },
+
+    // ─── Editar nombre de perfil ──────────────────
+    startEditName() {
+      this.nameDraft = this.userName === 'Cliente' ? '' : this.userName
+      this.editingName = true
+    },
+    cancelEditName() {
+      this.editingName = false
+    },
+    async saveName() {
+      const trimmed = this.nameDraft.trim()
+      if (!trimmed || !this.currentUserId) {
+        this.editingName = false
+        return
+      }
+      this.savingName = true
+      try {
+        const { error } = await insforge.database
+          .from('profiles')
+          .upsert({ id: this.currentUserId, full_name: trimmed })
+        if (error) {
+          console.warn('No se pudo guardar el nombre:', error)
+          alert('No se pudo guardar tu nombre. Intenta de nuevo.')
+          return
+        }
+        this.userName = trimmed
+        this.editingName = false
+      } catch (err) {
+        console.warn('Error inesperado guardando el nombre:', err)
+        alert('Error inesperado guardando tu nombre.')
+      } finally {
+        this.savingName = false
+      }
+    },
+
+    // ─── Direcciones ──────────────────────────────
+    async loadAddresses() {
+      if (!this.currentUserId) return
+      try {
+        const { data, error } = await insforge.database
+          .from('addresses')
+          .select('*')
+          .eq('client_id', this.currentUserId)
+          .order('created_at', { ascending: true })
+
+        if (error) {
+          console.warn('No se pudieron cargar las direcciones:', error)
+          return
+        }
+        this.addresses = data || []
+        const def = this.addresses.find((a) => a.is_default) || this.addresses[0]
+        if (def && !this.selectedAddressId) this.selectedAddressId = def.id
+      } catch (err) {
+        console.warn('Error inesperado cargando direcciones:', err)
+      }
+    },
+    openAddressForm(address) {
+      if (address) {
+        this.editingAddressId = address.id
+        this.addressDraft = {
+          label: address.label,
+          street: address.street,
+          city: address.city,
+          reference: address.reference || '',
+          is_default: !!address.is_default,
+        }
+      } else {
+        this.editingAddressId = null
+        this.addressDraft = { label: '', street: '', city: '', reference: '', is_default: this.addresses.length === 0 }
+      }
+      this.showAddressModal = true
+    },
+    closeAddressForm() {
+      this.showAddressModal = false
+    },
+    goManageAddresses() {
+      this.showCheckoutModal = false
+      this.currentView = 'profile'
+    },
+    async saveAddress() {
+      if (!this.currentUserId) return
+      this.savingAddress = true
+      try {
+        const payload = {
+          client_id: this.currentUserId,
+          label: this.addressDraft.label.trim(),
+          street: this.addressDraft.street.trim(),
+          city: this.addressDraft.city.trim(),
+          reference: this.addressDraft.reference.trim() || null,
+          is_default: this.addressDraft.is_default,
+        }
+        if (this.editingAddressId) payload.id = this.editingAddressId
+
+        // Si esta se marca como predeterminada, primero se les quita esa marca a las demás
+        if (payload.is_default) {
+          const others = this.addresses.filter((a) => a.id !== this.editingAddressId && a.is_default)
+          for (const o of others) {
+            await insforge.database.from('addresses').update({ is_default: false }).eq('id', o.id)
+          }
+        }
+
+        const { error } = await insforge.database.from('addresses').upsert(payload)
+        if (error) {
+          console.warn('No se pudo guardar la dirección:', error)
+          alert('No se pudo guardar la dirección. Intenta de nuevo.')
+          return
+        }
+        this.showAddressModal = false
+        await this.loadAddresses()
+      } catch (err) {
+        console.warn('Error inesperado guardando la dirección:', err)
+        alert('Error inesperado guardando la dirección.')
+      } finally {
+        this.savingAddress = false
+      }
+    },
+    async setDefaultAddress(address) {
+      try {
+        const others = this.addresses.filter((a) => a.id !== address.id && a.is_default)
+        for (const o of others) {
+          await insforge.database.from('addresses').update({ is_default: false }).eq('id', o.id)
+        }
+        await insforge.database.from('addresses').update({ is_default: true }).eq('id', address.id)
+        await this.loadAddresses()
+      } catch (err) {
+        console.warn('Error inesperado marcando dirección predeterminada:', err)
+      }
+    },
+    async deleteAddress(address) {
+      if (!confirm(`¿Eliminar la dirección "${address.label}"?`)) return
+      try {
+        const { error } = await insforge.database.from('addresses').delete().eq('id', address.id)
+        if (error) {
+          console.warn('No se pudo eliminar la dirección:', error)
+          return
+        }
+        if (this.selectedAddressId === address.id) this.selectedAddressId = null
+        await this.loadAddresses()
+      } catch (err) {
+        console.warn('Error inesperado eliminando la dirección:', err)
       }
     },
 
@@ -1413,14 +1678,16 @@ export default {
       }
 
       // ─ Registrar la venta real (para reportes de la empresa) y descontar stock ─
-      await this.registerSaleAndUpdateStock(newOrder.id, this.selectedPayment)
+      const chosenAddress = this.addresses.find((a) => a.id === this.selectedAddressId)
+      const deliveryAddressText = chosenAddress ? `${chosenAddress.street}, ${chosenAddress.city}` : null
+      await this.registerSaleAndUpdateStock(newOrder.id, this.selectedPayment, deliveryAddressText)
 
       this.pointsToRedeem = 0
       await this.clearCart()
       this.closeCheckoutModal()
     },
 
-    async registerSaleAndUpdateStock(orderRef, paymentMethod) {
+    async registerSaleAndUpdateStock(orderRef, paymentMethod, deliveryAddress) {
       if (this.cart.length === 0) return
 
       // 1) Una fila por UNIDAD vendida (respetando cantidad), para reportes reales
@@ -1437,6 +1704,7 @@ export default {
             category: item.category,
             unit_price: item.price,
             payment_method: paymentMethod,
+            delivery_address: deliveryAddress || null,
             client_id: this.currentUserId,
             client_name: this.userName,
           })
@@ -1478,6 +1746,7 @@ export default {
         status: order?.status || '',
         paymentMethod: order?.paymentMethod || null,
         total: order?.total || 0,
+        deliveryAddress: null,
       }
       this.orderDetailProducts = []
       this.showOrderDetailModal = true
@@ -1499,6 +1768,9 @@ export default {
           // Si el pago se hizo desde otra sesión/dispositivo, usamos el método guardado en la venta
           if (!this.orderDetailMeta.paymentMethod && data[0].payment_method) {
             this.orderDetailMeta.paymentMethod = data[0].payment_method
+          }
+          if (data[0].delivery_address) {
+            this.orderDetailMeta.deliveryAddress = data[0].delivery_address
           }
 
           const grouped = {}
@@ -1543,8 +1815,13 @@ export default {
       doc.text(`Cliente: ${this.userName || ''}`, 14, 46)
       doc.text(`Forma de pago: ${this.paymentMethodLabel(meta.paymentMethod)}`, 14, 53)
       doc.text(`Estado: ${meta.status}`, 14, 60)
+      let summaryY = 60
+      if (meta.deliveryAddress) {
+        summaryY += 7
+        doc.text(`Entrega: ${meta.deliveryAddress}`, 14, summaryY)
+      }
 
-      let y = 74
+      let y = summaryY + 14
       doc.setFontSize(12)
       doc.text('Producto', 14, y)
       doc.text('Empresa', 90, y)
@@ -2459,6 +2736,44 @@ header img {
   pointer-events: none;
   opacity: 0.7;
 }
+.profile-name-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+}
+.profile-name-row h3 {
+  margin: 0;
+}
+.edit-name-btn {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 0.85rem;
+  padding: 0.25rem;
+  transition: color 0.2s;
+}
+.edit-name-btn:hover {
+  color: var(--green-600);
+}
+.profile-name-edit {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+.name-edit-input {
+  flex: 1;
+  min-width: 0;
+  max-width: 220px;
+  padding: 0.4rem 0.7rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-family: inherit;
+  font-size: 0.95rem;
+}
 .profile-email {
   color: var(--text-muted);
   margin: 0.5rem 0;
@@ -2843,6 +3158,124 @@ header img {
   width: 100%;
   margin-bottom: 0.5rem;
 }
+.form-group {
+  margin-bottom: 1rem;
+}
+.form-group label {
+  display: block;
+  margin-bottom: 0.35rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-dark, #1a202c);
+}
+.form-input {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 0.6rem 0.9rem;
+  font-family: inherit;
+  font-size: 0.9rem;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* ── Direcciones ──────────────────────────────── */
+.addresses-card {
+  background: var(--white);
+  border-radius: var(--radius-lg);
+  padding: 1.5rem;
+  border: 1px solid var(--border);
+  max-width: 600px;
+  margin: 1.5rem auto 0;
+}
+.addresses-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+}
+.address-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.8rem;
+  padding: 0.7rem 0.9rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  flex-wrap: wrap;
+}
+.address-row-info {
+  min-width: 0;
+}
+.address-row-label {
+  font-weight: 600;
+  font-size: 0.9rem;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+.address-row-detail {
+  font-size: 0.83rem;
+  color: var(--text-mid);
+  margin-top: 0.15rem;
+}
+.address-row-ref {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  margin-top: 0.1rem;
+}
+.address-row-actions {
+  display: flex;
+  gap: 0.3rem;
+  flex-shrink: 0;
+}
+.address-default-tag {
+  background: var(--green-50);
+  color: var(--green-600);
+  font-size: 0.68rem;
+  font-weight: 700;
+  padding: 0.15rem 0.5rem;
+  border-radius: 40px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+.address-default-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.85rem;
+  color: var(--text-mid);
+  cursor: pointer;
+}
+.address-select-box {
+  background: var(--off-white, #f8faf9);
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 0.9rem;
+  margin: 1rem 0;
+}
+.address-option-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+.address-option {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  padding: 0.5rem 0.6rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 0.85rem;
+  transition: border-color 0.2s;
+}
+.address-option.active {
+  border-color: var(--green-500);
+  background: var(--green-50);
+}
+.address-option input {
+  margin-top: 0.2rem;
+}
 
 /* ── Seguimiento (Tracking) ───────────────────── */
 .tracking-layout {
@@ -3044,7 +3477,7 @@ footer {
 @media (max-width: 480px) {
   header { padding: 0.6rem 4vw; }
   header h1 { font-size: 1.4rem; }
-  header img { width: 32px; height: 32px; }
+  header img { width: 3 2px; height: 32px; }
   .navbar li {
     padding: 0.28rem 0.5rem;
     font-size: 0.72rem;
