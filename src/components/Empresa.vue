@@ -748,6 +748,118 @@
       </template>
 
       <!-- ════════════════════════════════════════
+           VISTA: CLIENTES
+      ════════════════════════════════════════ -->
+      <template v-if="currentView === 'clients'">
+        <div class="page-header">
+          <h2><i class="fas fa-users"></i> Gestión de Clientes</h2>
+          <p class="page-subtitle">Historial y actividad de quienes te han comprado</p>
+        </div>
+
+        <div class="fleet-kpi-row">
+          <div class="card-panel fleet-kpi-card">
+            <div class="fleet-kpi-number">{{ clientsSummary.length }}</div>
+            <div class="fleet-kpi-label"><i class="fas fa-users"></i> Clientes distintos</div>
+          </div>
+          <div class="card-panel fleet-kpi-card">
+            <div class="fleet-kpi-number">${{ clientsTotalRevenue.toFixed(0) }}</div>
+            <div class="fleet-kpi-label"><i class="fas fa-dollar-sign"></i> Ingresos totales</div>
+          </div>
+          <div class="card-panel fleet-kpi-card">
+            <div class="fleet-kpi-number">{{ repeatClientsCount }}</div>
+            <div class="fleet-kpi-label"><i class="fas fa-redo"></i> Clientes recurrentes (2+ pedidos)</div>
+          </div>
+        </div>
+
+        <div class="card-panel">
+          <div class="table-scroll">
+            <table class="order-table">
+              <thead>
+                <tr>
+                  <th>Cliente</th>
+                  <th>Pedidos</th>
+                  <th>Total gastado</th>
+                  <th>Última compra</th>
+                  <th>Calificación</th>
+                  <th>Acciones</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="c in clientsSummary" :key="c.clientId">
+                  <td>
+                    <div class="product-cell">
+                      <div class="driver-avatar">
+                        <img v-if="c.avatarUrl" :src="c.avatarUrl" alt="" class="client-avatar-img" />
+                        <template v-else>{{ c.initials }}</template>
+                      </div>
+                      <span>{{ c.name }}</span>
+                    </div>
+                  </td>
+                  <td>{{ c.orderCount }}</td>
+                  <td class="order-total">${{ c.totalSpent.toFixed(2) }}</td>
+                  <td>{{ c.lastPurchase }}</td>
+                  <td>
+                    <span v-if="c.avgRating !== null">⭐ {{ c.avgRating.toFixed(1) }}</span>
+                    <span v-else class="report-empty-hint">Sin reseñas</span>
+                  </td>
+                  <td>
+                    <button class="btn btn-outline btn-sm" @click="openClientDetail(c)">
+                      <i class="fas fa-eye"></i> Ver historial
+                    </button>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <p v-if="!clientsSummary.length" class="empty-catalog-msg">
+            Todavía no tienes clientes con ventas registradas.
+          </p>
+        </div>
+      </template>
+
+      <!-- Modal: detalle de cliente -->
+      <div class="modal-overlay" v-if="showClientDetailModal" @click.self="closeClientDetail">
+        <div class="modal-content">
+          <button class="modal-close" @click="closeClientDetail">&times;</button>
+          <h2><i class="fas fa-user"></i> {{ selectedClientDetail?.name }}</h2>
+          <div class="order-detail-summary" v-if="selectedClientDetail">
+            <p><strong>Pedidos totales:</strong> {{ selectedClientDetail.orderCount }}</p>
+            <p><strong>Total gastado:</strong> ${{ selectedClientDetail.totalSpent.toFixed(2) }}</p>
+            <p><strong>Última compra:</strong> {{ selectedClientDetail.lastPurchase }}</p>
+            <p v-if="selectedClientDetail.avgRating !== null"><strong>Calificación promedio:</strong> ⭐ {{ selectedClientDetail.avgRating.toFixed(1) }}</p>
+          </div>
+
+          <p class="rate-product-title" style="margin-top: 1rem;">Historial de pedidos</p>
+          <div class="reviews-panel-list" v-if="selectedClientOrders.length">
+            <div v-for="o in selectedClientOrders" :key="o.orderRef" class="review-item">
+              <div class="review-item-header">
+                <span class="review-item-name">Pedido {{ o.orderRef }}</span>
+                <span>${{ o.total.toFixed(2) }}</span>
+              </div>
+              <div class="review-item-product">{{ o.items.join(', ') }}</div>
+              <p class="review-item-comment" v-if="o.deliveryAddress">
+                <i class="fas fa-map-marker-alt"></i> {{ o.deliveryAddress }}
+              </p>
+              <p class="review-item-comment">{{ paymentMethodLabelEs(o.paymentMethod) }} · {{ o.date }}</p>
+            </div>
+          </div>
+          <p v-else class="report-empty-hint">No se encontró historial detallado.</p>
+
+          <p class="rate-product-title" style="margin-top: 1rem;" v-if="selectedClientReviews.length">Reseñas dejadas</p>
+          <div class="reviews-panel-list" v-if="selectedClientReviews.length">
+            <div v-for="(r, i) in selectedClientReviews" :key="i" class="review-item">
+              <div class="review-item-header">
+                <span class="review-item-stars">
+                  <span v-for="n in 5" :key="n" :class="{ 'star-filled': n <= r.rating }">★</span>
+                </span>
+              </div>
+              <p v-if="r.comment" class="review-item-comment">{{ r.comment }}</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ════════════════════════════════════════
            VISTA: INVENTARIO
       ════════════════════════════════════════ -->
       <template v-if="currentView === 'inventory'">
@@ -1141,7 +1253,8 @@
               @click="selectClientConversation(conv)"
             >
               <div class="conv-avatar">
-                <span>{{ conv.clientName.slice(0, 2).toUpperCase() }}</span>
+                <img v-if="conv.avatarUrl" :src="conv.avatarUrl" alt="" class="client-avatar-img" />
+                <span v-else>{{ conv.clientName.slice(0, 2).toUpperCase() }}</span>
               </div>
               <div class="conv-info">
                 <div class="conv-name">{{ conv.clientName }}</div>
@@ -1153,7 +1266,10 @@
           <div class="chat-panel">
             <div class="chat-header" v-if="selectedClientId">
               <div class="chat-driver-info">
-                <div class="chat-driver-avatar">{{ selectedClientName.slice(0, 2).toUpperCase() }}</div>
+                <div class="chat-driver-avatar">
+                  <img v-if="selectedClientAvatarUrl" :src="selectedClientAvatarUrl" alt="" class="client-avatar-img" />
+                  <template v-else>{{ selectedClientName.slice(0, 2).toUpperCase() }}</template>
+                </div>
                 <div>
                   <div class="chat-driver-name">{{ selectedClientName }}</div>
                 </div>
@@ -1279,6 +1395,7 @@ export default {
         { key: 'dashboard', label: 'Dashboard', icon: 'fas fa-chart-line' },
         { key: 'catalog', label: 'Catálogo', icon: 'fas fa-store' },
         { key: 'orders', label: 'Pedidos', icon: 'fas fa-box', badge: '12' },
+        { key: 'clients', label: 'Clientes', icon: 'fas fa-users' },
         { key: 'inventory', label: 'Inventario', icon: 'fas fa-warehouse' },
         { key: 'fleet', label: 'Flota', icon: 'fas fa-truck' },
         { key: 'messages', label: 'Mensajes', icon: 'fas fa-comment-dots' },
@@ -1371,6 +1488,8 @@ export default {
 
       realSalesRecords: [], // se llena desde InsForge (tabla sales) al montar — ventas reales por producto
       realReviewsRecords: [], // se llena desde InsForge (tabla reviews) al montar — reseñas reales de mis productos
+      showClientDetailModal: false,
+      selectedClientDetail: null,
 
       lowStockProducts: [
         { id: 1, icon: '💻', name: 'Laptop Dell XPS', stock: 3, sku: 'DELL-XPS-001' },
@@ -1395,6 +1514,7 @@ export default {
       clientConversations: [],
       selectedClientId: null,
       selectedClientName: '',
+      selectedClientAvatarUrl: null,
       clientChatMessages: [],
       clientChatInput: '',
       clientChatLoading: false,
@@ -1536,6 +1656,87 @@ export default {
       if (this.realReviewsRecords.length === 0) return null
       const sum = this.realReviewsRecords.reduce((acc, r) => acc + (Number(r.rating) || 0), 0)
       return sum / this.realReviewsRecords.length
+    },
+
+    // ─── Gestión de Clientes ──────────────────────
+    clientsSummary() {
+      const groups = {}
+      this.realSalesRecords.forEach((row) => {
+        if (!row.client_id) return
+        if (!groups[row.client_id]) {
+          groups[row.client_id] = {
+            clientId: row.client_id,
+            name: row.client_name || 'Cliente',
+            avatarUrl: row.avatar_url || null,
+            orderRefs: new Set(),
+            totalSpent: 0,
+            lastPurchaseDate: null,
+          }
+        }
+        const g = groups[row.client_id]
+        g.orderRefs.add(row.order_ref)
+        g.totalSpent += Number(row.unit_price) || 0
+        const rowDate = row.created_at ? new Date(row.created_at) : null
+        if (rowDate && (!g.lastPurchaseDate || rowDate > g.lastPurchaseDate)) {
+          g.lastPurchaseDate = rowDate
+          // Nos quedamos con la foto de la compra más reciente (por si cambió su avatar)
+          if (row.avatar_url) g.avatarUrl = row.avatar_url
+        }
+      })
+
+      const reviewsByClient = {}
+      this.realReviewsRecords.forEach((r) => {
+        if (!r.client_id) return
+        if (!reviewsByClient[r.client_id]) reviewsByClient[r.client_id] = []
+        reviewsByClient[r.client_id].push(Number(r.rating) || 0)
+      })
+
+      return Object.values(groups)
+        .map((g) => {
+          const ratings = reviewsByClient[g.clientId] || []
+          return {
+            clientId: g.clientId,
+            name: g.name,
+            avatarUrl: g.avatarUrl,
+            initials: g.name.split(' ').map((w) => w[0]).join('').toUpperCase().slice(0, 2),
+            orderCount: g.orderRefs.size,
+            totalSpent: g.totalSpent,
+            lastPurchase: g.lastPurchaseDate ? g.lastPurchaseDate.toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' }) : '—',
+            avgRating: ratings.length ? ratings.reduce((a, b) => a + b, 0) / ratings.length : null,
+          }
+        })
+        .sort((a, b) => b.totalSpent - a.totalSpent)
+    },
+    clientsTotalRevenue() {
+      return this.clientsSummary.reduce((sum, c) => sum + c.totalSpent, 0)
+    },
+    repeatClientsCount() {
+      return this.clientsSummary.filter((c) => c.orderCount >= 2).length
+    },
+    selectedClientOrders() {
+      if (!this.selectedClientDetail) return []
+      const groups = {}
+      this.realSalesRecords
+        .filter((row) => row.client_id === this.selectedClientDetail.clientId)
+        .forEach((row) => {
+          if (!groups[row.order_ref]) {
+            groups[row.order_ref] = {
+              orderRef: row.order_ref,
+              items: [],
+              total: 0,
+              paymentMethod: row.payment_method,
+              deliveryAddress: row.delivery_address,
+              date: row.created_at ? new Date(row.created_at).toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' }) : '',
+            }
+          }
+          groups[row.order_ref].items.push(row.product_title)
+          groups[row.order_ref].total += Number(row.unit_price) || 0
+        })
+      return Object.values(groups).reverse()
+    },
+    selectedClientReviews() {
+      if (!this.selectedClientDetail) return []
+      return this.realReviewsRecords.filter((r) => r.client_id === this.selectedClientDetail.clientId)
     },
     stats() {
       return [
@@ -2097,6 +2298,7 @@ export default {
             byClient[msg.client_id] = {
               clientId: msg.client_id,
               clientName: msg.client_name || 'Cliente',
+              avatarUrl: msg.avatar_url || null,
               lastMessage: msg.text,
               lastTime: msg.created_at,
             }
@@ -2111,6 +2313,7 @@ export default {
     selectClientConversation(conv) {
       this.selectedClientId = conv.clientId
       this.selectedClientName = conv.clientName
+      this.selectedClientAvatarUrl = conv.avatarUrl || null
       this.loadClientChatMessages()
       if (this.clientChatPollInterval) clearInterval(this.clientChatPollInterval)
       this.clientChatPollInterval = setInterval(() => {
@@ -2430,6 +2633,18 @@ export default {
       } catch (err) {
         console.warn('Error cargando datos de ventas:', err)
       }
+    },
+    openClientDetail(client) {
+      this.selectedClientDetail = client
+      this.showClientDetailModal = true
+    },
+    closeClientDetail() {
+      this.showClientDetailModal = false
+      this.selectedClientDetail = null
+    },
+    paymentMethodLabelEs(method) {
+      const labels = { card: 'Tarjeta', paypal: 'PayPal', transfer: 'Transferencia bancaria', cash: 'Efectivo contra entrega' }
+      return labels[method] || 'No especificada'
     },
     async loadReviewsData() {
       try {
@@ -3385,6 +3600,13 @@ export default {
   font-weight: 700;
   font-size: 0.78rem;
   flex-shrink: 0;
+  overflow: hidden;
+}
+.client-avatar-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 50%;
 }
 .driver-right {
   display: flex;
@@ -4490,6 +4712,7 @@ export default {
   font-weight: 700;
   font-size: 0.8rem;
   flex-shrink: 0;
+  overflow: hidden;
 }
 .status-dot {
   position: absolute;
@@ -4559,6 +4782,7 @@ export default {
   font-weight: 700;
   font-size: 0.8rem;
   flex-shrink: 0;
+  overflow: hidden;
 }
 .chat-driver-name {
   font-weight: 700;

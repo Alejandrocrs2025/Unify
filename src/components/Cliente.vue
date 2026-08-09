@@ -1248,6 +1248,7 @@ export default {
         const { error } = await insforge.database.from('messages').insert([{
           client_id: this.currentUserId,
           client_name: this.userName,
+          avatar_url: this.avatarUrl || null,
           company_id: this.companyChat.companyId,
           company_name: this.companyChat.companyName,
           sender_id: this.currentUserId,
@@ -1707,6 +1708,7 @@ export default {
             delivery_address: deliveryAddress || null,
             client_id: this.currentUserId,
             client_name: this.userName,
+            avatar_url: this.avatarUrl || null,
           })
         }
       })
