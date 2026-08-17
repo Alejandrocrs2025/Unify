@@ -581,7 +581,7 @@ h3 { font-size: 1.25rem; font-weight: 600; }
   display: flex; 
   gap: 2rem; 
   list-style: none; 
-  margin-right: 45px; 
+  margin: 0 auto; 
 }
 .nav-links a {
   font-size: .88rem; 
@@ -607,7 +607,6 @@ h3 { font-size: 1.25rem; font-weight: 600; }
   display: flex; 
   gap: .75rem; 
   align-items: center; 
-  margin-left: auto;
 }
 
 /* ─── HERO ────────────────────────────────────────────────── */
@@ -934,6 +933,7 @@ h3 { font-size: 1.25rem; font-weight: 600; }
   .hero          { grid-template-columns: 1fr; padding-top: 90px; }
   .hero-visual   { display: none; }
   .nav-links     { display: none; }
+  .nav-actions   { margin-left: auto; }
   .features-grid { grid-template-columns: 1fr; }
   .feat-big      { grid-column: span 1; }
   .modules-grid  { grid-template-columns: repeat(2, 1fr); }
