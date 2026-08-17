@@ -8,13 +8,33 @@
 
       <nav class="navbar" aria-label="Navegación principal">
         <ul class="list">
-          <li tabindex="0">Menú</li>
-          <li tabindex="0">Secciones</li>
-          <li tabindex="0">Idioma</li>
-          <li tabindex="0">Configuración</li>
+          <li tabindex="0" @click="showHowItWorks = true" @keydown.enter.prevent="showHowItWorks = true">¿Cómo funciona?</li>
+          <li tabindex="0" @click="showHelp = true" @keydown.enter.prevent="showHelp = true">Ayuda</li>
         </ul>
       </nav>
     </header>
+
+    <!-- Modal: ¿Cómo funciona? -->
+    <div class="info-modal-overlay" v-if="showHowItWorks" @click.self="showHowItWorks = false">
+      <div class="info-modal">
+        <button class="info-modal-close" @click="showHowItWorks = false" aria-label="Cerrar">&times;</button>
+        <h3>¿Cómo funciona Unify?</h3>
+        <ul class="info-modal-list">
+          <li><strong>Como Cliente:</strong> explora catálogos por empresa, compra productos y rastrea tu pedido en tiempo real en el mapa.</li>
+          <li><strong>Como Empresa:</strong> publica tu catálogo, gestiona inventario y pedidos, y chatea directo con tus clientes.</li>
+          <li>Elige el tipo de cuenta que corresponda a continuación para empezar.</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- Modal: Ayuda -->
+    <div class="info-modal-overlay" v-if="showHelp" @click.self="showHelp = false">
+      <div class="info-modal">
+        <button class="info-modal-close" @click="showHelp = false" aria-label="Cerrar">&times;</button>
+        <h3>¿Necesitas ayuda?</h3>
+        <p>Si tienes problemas para elegir o acceder a tu cuenta, escríbenos a <a href="mailto:soporte@unify.com">soporte@unify.com</a> y con gusto te ayudamos.</p>
+      </div>
+    </div>
 
     <main>
       <div class="container">
@@ -37,8 +57,12 @@
 </template>
 
 <script setup>
+import { ref } from 'vue'
 import { insforge } from '../insforgeClient.js'
 const emit = defineEmits(['switch-view'])
+
+const showHowItWorks = ref(false)
+const showHelp = ref(false)
 
 const normalizeRole = (value) => {
   const raw = String(value ?? '').trim().toLowerCase()
@@ -294,5 +318,77 @@ main {
     flex-wrap: wrap;
     justify-content: center;
   }
+}
+
+/* Modal: ¿Cómo funciona? / Ayuda */
+.info-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(11, 60, 109, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 200;
+  padding: 1rem;
+}
+
+.info-modal {
+  background: white;
+  border-radius: 16px;
+  padding: 2rem;
+  max-width: 460px;
+  width: 100%;
+  position: relative;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
+}
+
+.info-modal h3 {
+  color: var(--bg-start);
+  margin-bottom: 1rem;
+  font-size: 1.3rem;
+}
+
+.info-modal p {
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+.info-modal p a {
+  color: var(--bg-start);
+  font-weight: 600;
+}
+
+.info-modal-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+
+.info-modal-list li {
+  color: var(--muted);
+  line-height: 1.5;
+  font-size: 0.95rem;
+}
+
+.info-modal-list li strong {
+  color: var(--bg-start);
+}
+
+.info-modal-close {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  background: none;
+  border: none;
+  font-size: 1.5rem;
+  line-height: 1;
+  cursor: pointer;
+  color: var(--muted-2);
+  transition: color 0.2s ease;
+}
+
+.info-modal-close:hover {
+  color: var(--bg-start);
 }
 </style>
