@@ -172,7 +172,7 @@
       <div class="profile-header">
         <div class="profile-info">
           <p class="welcome-sub">Panel operativo</p>
-          <h2>Bienvenido, {{ companyName }} 🏢</h2>
+          <h2>Bienvenido, {{ companyName }} </h2>
           <p class="welcome-desc">{{ todayDate }} · {{ activeOrders }} pedidos activos</p>
         </div>
         <div class="header-right-actions">
@@ -1741,7 +1741,7 @@ export default {
     stats() {
       return [
         {
-          icon: '💰',
+          icon: '',
           label: 'Ventas del mes',
           value: `$${this.revenueThisMonth.toFixed(2)}`,
           color: 'var(--green-600)',
@@ -1749,7 +1749,7 @@ export default {
           trendUp: this.revenueChangePercent >= 0,
         },
         {
-          icon: '📦',
+          icon: '',
           label: 'Pedidos este mes',
           value: String(this.ordersThisMonthCount),
           color: 'var(--sky-600)',
@@ -1757,7 +1757,7 @@ export default {
           trendUp: true,
         },
         {
-          icon: '👥',
+          icon: '',
           label: 'Clientes activos',
           value: String(this.activeClientsCount),
           color: 'var(--green-400)',
@@ -1765,7 +1765,7 @@ export default {
           trendUp: true,
         },
         {
-          icon: '⭐',
+          icon: '',
           label: 'Calificación promedio',
           value: this.averageProductRating !== null ? this.averageProductRating.toFixed(1) : 'Sin calificaciones',
           color: '#f59e0b',
