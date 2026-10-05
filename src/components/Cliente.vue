@@ -67,7 +67,7 @@
           </button>
         </div>
 
-        <h3 style="margin-bottom: 1rem;">🔥 Productos destacados</h3>
+        <h3 style="margin-bottom: 1rem;"> Productos destacados</h3>
         <div class="products-grid">
           <div
             v-for="product in filteredProducts"

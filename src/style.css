@@ -65,3 +65,18 @@ body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
 img { display: block; max-width: 100%; }
 a { text-decoration: none; }
 
+/* google translate */
+.goog-te-banner-frame,
+.skiptranslate iframe { display: none !important; }
+body { top: 0 !important; }
+
+.goog-text-highlight { background: none !important; box-shadow: none !important; }
+#goog-gt-tt, .goog-tooltip, .goog-tooltip:hover { display: none !important; }
+.goog-te-gadget { display: none !important; }
+
+body > .skiptranslate,
+.VIpgJd-ZVi9od-aZ2wEe-wOHMyf,
+.VIpgJd-ZVi9od-aZ2wEe-OiiCO,
+.VIpgJd-ZVi9od-ORHb-OEVmcd { display: none !important; visibility: hidden !important; }
+
+html, body { top: 0 !important; position: static !important; }

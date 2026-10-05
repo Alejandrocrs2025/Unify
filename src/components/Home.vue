@@ -7,7 +7,7 @@
     <nav class="navbar">
       <div class="container">
         <img src="/img/logo-unify.png" alt="logo" class="logo_Unify" />
-        <a href="#" class="nav-logo"><span>U</span>nify</a>
+        <a href="#" class="nav-logo" translate="no"><span>U</span>nify</a>
         <ul class="nav-links">
           <li><a href="#modulos">Módulos</a></li>
           <li><a href="#tracking">Monitoreo</a></li>
@@ -15,6 +15,7 @@
           <li><a href="#social">Redes</a></li>
         </ul>
         <div class="nav-actions">
+          <LangSwitch />
           <button v-if="loggedIn" type="button" class="btn btn-ghost" @click="signOut">Cerrar sesión</button>
           <button v-else type="button" class="btn btn-ghost" @click="goToLogin">Iniciar sesión</button>
           <button type="button" class="btn btn-primary" @click="goToRegister">Comenzar gratis</button>
@@ -269,8 +270,8 @@
     <footer class="footer">
       <div class="footer-top">
         <div class="footer-brand">
-          <a href="#" class="nav-logo" style="display:inline-block;margin-bottom:.5rem">
-            Uni<span style="color:var(--sky-400)">fy</span>
+          <a href="#" class="nav-logo" translate="no" style="display:inline-block;margin-bottom:.5rem">
+          Uni<span style="color:var(--sky-400)">fy</span>
           </a>
           <p>Plataforma integral para empresas de logística y distribución.</p>
         </div>
@@ -317,6 +318,8 @@
 <script setup>
 import { ref, nextTick, onMounted, onBeforeUnmount } from 'vue'
 import { insforge } from '../insforgeClient.js'
+import LangSwitch from './LangSwitch.vue'
+
 
 const emit = defineEmits(['switch-view'])
 
@@ -417,6 +420,7 @@ const loadUserRole = () => {
     console.warn('No se pudo leer userRole en localStorage', e)
   }
 }
+
 
 const checkSession = async () => {
   try {

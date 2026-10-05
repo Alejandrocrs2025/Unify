@@ -6,7 +6,7 @@
     <header class="market-header">
       <div class="header-left">
         <img src="/img/logo-unify.png" alt="Unify Logo" class="logo" />
-        <h1><span>U</span>nify <span class="header-role-tag">Empresa</span></h1>
+        <h1><span translate="no">U</span>nify <span class="header-role-tag">Empresa</span></h1>
       </div>
 
       <!-- Barra de búsqueda global con resultados -->
@@ -18,7 +18,6 @@
           placeholder="Buscar productos, pedidos, clientes..." 
           @focus="searchFocused = true"
           @blur="closeSearchResults"
-          @input="performSearch"
         />
         <div class="search-shortcut" v-if="!searchFocused && !globalSearch">⌘K</div>
         <!-- Dropdown de resultados -->
@@ -34,14 +33,14 @@
               <img :src="p.image" alt="" class="result-thumb" />
               <div class="result-info">
                 <div class="result-name">{{ p.title }}</div>
-                <div class="result-detail">${{ p.price.toFixed(2) }} · {{ p.category }}</div>
+                <div class="result-detail">{{ money(p.price) }} · {{ p.category }}</div>
               </div>
             </div>
           </div>
-          <div class="search-result-group" v-if="filteredOrders.length">
+          <div class="search-result-group" v-if="filteredOrdersSearch.length">
             <div class="result-group-title">Pedidos</div>
             <div 
-              v-for="o in filteredOrders.slice(0, 5)" 
+              v-for="o in filteredOrdersSearch.slice(0, 5)" 
               :key="'o-' + o.id" 
               class="search-result-item"
               @mousedown.prevent="navigateTo('orders', { order: o })"
@@ -53,13 +52,15 @@
               </div>
             </div>
           </div>
-          <div class="search-result-empty" v-if="!filteredProducts.length && !filteredOrders.length">
+          <div class="search-result-empty" v-if="!filteredProducts.length && !filteredOrdersSearch.length">
             No se encontraron resultados
           </div>
         </div>
       </div>
 
       <div class="header-right">
+        <LangSwitch />
+
         <!-- Notificaciones -->
         <div class="notif-wrapper">
           <div class="notif-bell" @click="toggleNotifications">
@@ -83,7 +84,7 @@
                 <div class="notif-item-icon"><i class="fas fa-shopping-bag"></i></div>
                 <div class="notif-item-body">
                   <div class="notif-item-title">{{ n.clientName || 'Un cliente' }} compró {{ n.itemCount }} producto{{ n.itemCount === 1 ? '' : 's' }}</div>
-                  <div class="notif-item-meta">Pedido {{ n.orderRef }} · ${{ n.total.toFixed(2) }} · {{ n.timeAgo }}</div>
+                  <div class="notif-item-meta">Pedido {{ n.orderRef }} · {{ money(n.total) }} · {{ n.timeAgo }}</div>
                 </div>
               </div>
             </div>
@@ -94,7 +95,7 @@
         <!-- Carrito (desde perspectiva empresa) -->
         <div class="cart-icon" @click="currentView = 'orders'">
           <i class="fas fa-shopping-cart"></i>
-          <span class="cart-badge">{{ cartCount }}</span>
+          <span class="cart-badge" v-if="cartCount > 0">{{ cartCount }}</span>
         </div>
 
         <!-- Perfil empresa -->
@@ -103,7 +104,7 @@
             <img v-if="companyLogoUrl" :src="companyLogoUrl" alt="Logo" />
             <span v-else>{{ companyInitials }}</span>
           </div>
-          <span class="profile-name">{{ companyName }}</span>
+          <span class="profile-name" translate="no">{{ companyName }}</span>
           <i class="fas fa-chevron-down" :class="{ rotated: profileMenuOpen }"></i>
         </div>
 
@@ -152,7 +153,7 @@
     <nav class="sub-nav">
       <div class="sub-nav-inner">
         <button 
-          v-for="tab in mainTabs" 
+          v-for="tab in mainTabsView" 
           :key="tab.key"
           class="sub-nav-btn"
           :class="{ active: currentView === tab.key }"
@@ -172,7 +173,7 @@
       <div class="profile-header">
         <div class="profile-info">
           <p class="welcome-sub">Panel operativo</p>
-          <h2>Bienvenido, {{ companyName }} </h2>
+          <h2>Bienvenido, <span translate="no">{{ companyName }}</span></h2>
           <p class="welcome-desc">{{ todayDate }} · {{ activeOrders }} pedidos activos</p>
         </div>
         <div class="header-right-actions">
@@ -247,12 +248,12 @@
               <h3><i class="fas fa-chart-bar"></i> Ventas de la semana</h3>
               <span class="panel-badge">Esta semana</span>
             </div>
-            <div class="weekly-total">${{ weeklyTotal.toLocaleString() }}<span class="weekly-label"> ingresos totales</span></div>
+            <div class="weekly-total">{{ money(weeklyTotal) }}<span class="weekly-label"> ingresos totales</span></div>
             <div class="bar-chart">
               <div class="bar-item" v-for="day in salesData" :key="day.label">
                 <div class="bar-label">
                   <span>{{ day.label }}</span>
-                  <span class="bar-amount">${{ day.amount.toLocaleString() }}</span>
+                  <span class="bar-amount">{{ money(day.amount) }}</span>
                 </div>
                 <div class="bar-track">
                   <div class="bar-fill" :style="{ width: (day.amount / maxSales * 100) + '%' }"
@@ -337,7 +338,7 @@
               <div class="pub-body">
                 <div class="pub-category">{{ p.category }}</div>
                 <div class="pub-title">{{ p.title }}</div>
-                <div class="pub-price">${{ p.price.toFixed(2) }}</div>
+                <div class="pub-price">{{ money(p.price) }}</div>
                 <div class="pub-rating">
                   <span class="stars">{{ getStars(p.rating) }}</span>
                   <span class="rating-count">({{ p.reviews || 0 }})</span>
@@ -602,9 +603,9 @@
                     <span class="lp-rating-count">(0 reseñas)</span>
                   </div>
                   <div class="lp-price-wrap">
-                    <span class="lp-price">${{ newProduct.price ? newProduct.price.toFixed(2) : '0.00' }}</span>
+                    <span class="lp-price">{{ money(newProduct.price) }}</span>
                     <span class="lp-original" v-if="newProduct.originalPrice > newProduct.price">
-                      ${{ newProduct.originalPrice.toFixed(2) }}
+                      {{ money(newProduct.originalPrice) }}
                     </span>
                   </div>
                   <div class="lp-bullets" v-if="newProduct.bullets.some(b => b.trim())">
@@ -762,7 +763,7 @@
             <div class="fleet-kpi-label"><i class="fas fa-users"></i> Clientes distintos</div>
           </div>
           <div class="card-panel fleet-kpi-card">
-            <div class="fleet-kpi-number">${{ clientsTotalRevenue.toFixed(0) }}</div>
+            <div class="fleet-kpi-number">{{ money(clientsTotalRevenue) }}</div>
             <div class="fleet-kpi-label"><i class="fas fa-dollar-sign"></i> Ingresos totales</div>
           </div>
           <div class="card-panel fleet-kpi-card">
@@ -796,7 +797,7 @@
                     </div>
                   </td>
                   <td>{{ c.orderCount }}</td>
-                  <td class="order-total">${{ c.totalSpent.toFixed(2) }}</td>
+                  <td class="order-total">{{ money(c.totalSpent) }}</td>
                   <td>{{ c.lastPurchase }}</td>
                   <td>
                     <span v-if="c.avgRating !== null">⭐ {{ c.avgRating.toFixed(1) }}</span>
@@ -824,7 +825,7 @@
           <h2><i class="fas fa-user"></i> {{ selectedClientDetail?.name }}</h2>
           <div class="order-detail-summary" v-if="selectedClientDetail">
             <p><strong>Pedidos totales:</strong> {{ selectedClientDetail.orderCount }}</p>
-            <p><strong>Total gastado:</strong> ${{ selectedClientDetail.totalSpent.toFixed(2) }}</p>
+            <p><strong>Total gastado:</strong> {{ money(selectedClientDetail.totalSpent) }}</p>
             <p><strong>Última compra:</strong> {{ selectedClientDetail.lastPurchase }}</p>
             <p v-if="selectedClientDetail.avgRating !== null"><strong>Calificación promedio:</strong> ⭐ {{ selectedClientDetail.avgRating.toFixed(1) }}</p>
           </div>
@@ -834,7 +835,7 @@
             <div v-for="o in selectedClientOrders" :key="o.orderRef" class="review-item">
               <div class="review-item-header">
                 <span class="review-item-name">Pedido {{ o.orderRef }}</span>
-                <span>${{ o.total.toFixed(2) }}</span>
+                <span>{{ money(o.total) }}</span>
               </div>
               <div class="review-item-product">{{ o.items.join(', ') }}</div>
               <p class="review-item-comment" v-if="o.deliveryAddress">
@@ -913,7 +914,7 @@
                       {{ p.stock }} uds
                     </span>
                   </td>
-                  <td>${{ p.price.toFixed(2) }}</td>
+                  <td>{{ money(p.price) }}</td>
                   <td><span class="status-badge" :class="'pstatus-' + p.status.toLowerCase()">{{ p.status }}</span></td>
                   <td>
                     <button class="btn btn-outline btn-sm" @click="editProduct(p)">
@@ -990,7 +991,7 @@
             <div class="product-list" v-if="pendingTrackingOrders.length">
               <div class="product-item" v-for="o in pendingTrackingOrders" :key="o.orderId">
                 <div class="product-left">
-                  <div class="driver-avatar">📦</div>
+                  <div class="driver-avatar"></div>
                   <div>
                     <div class="product-name">Pedido {{ o.orderId }}</div>
                     <div class="product-stock">
@@ -1047,7 +1048,7 @@
             </div>
             <div class="revenue-compare">
               <div class="revenue-now">
-                <span class="revenue-amount">${{ revenueThisMonth.toFixed(2) }}</span>
+                <span class="revenue-amount">{{ money(revenueThisMonth) }}</span>
                 <span class="revenue-label">Este mes</span>
               </div>
               <div class="revenue-change" :class="revenueChangePercent >= 0 ? 'positive' : 'negative'">
@@ -1055,7 +1056,7 @@
                 {{ Math.abs(revenueChangePercent) }}%
               </div>
               <div class="revenue-prev">
-                <span class="revenue-amount-sm">${{ revenueLastMonth.toFixed(2) }}</span>
+                <span class="revenue-amount-sm">{{ money(revenueLastMonth) }}</span>
                 <span class="revenue-label">Mes anterior</span>
               </div>
             </div>
@@ -1067,7 +1068,7 @@
               <span class="report-period">Por pedido</span>
             </div>
             <div class="avg-ticket-display">
-              <span class="avg-ticket-amount">${{ averageTicket.toFixed(2) }}</span>
+              <span class="avg-ticket-amount">{{ money(averageTicket) }}</span>
               <span class="avg-ticket-hint">promedio gastado por pedido</span>
             </div>
           </div>
@@ -1121,7 +1122,7 @@
 
           <div class="card-panel report-card">
             <div class="report-header">
-              <h4>⚠️ Alerta de quiebre de stock</h4>
+              <h4> Alerta de quiebre de stock</h4>
               <span class="report-period">Proyección según ritmo de venta</span>
             </div>
             <div class="stockout-list" v-if="stockoutAlerts.length > 0">
@@ -1133,7 +1134,7 @@
                 </span>
               </div>
             </div>
-            <p v-else class="report-empty-hint">Ningún producto en riesgo de agotarse pronto 👍</p>
+            <p v-else class="report-empty-hint">Ningún producto en riesgo de agotarse pronto </p>
           </div>
 
           <div class="card-panel report-card">
@@ -1358,6 +1359,22 @@
       </div>
     </footer>
 
+    <!-- Avisos (reemplazan a alert) -->
+    <div class="toast-stack" aria-live="polite">
+      <div v-for="t in toasts" :key="t.id" class="toast-item" :class="'toast-' + t.type">{{ t.message }}</div>
+    </div>
+
+    <!-- Confirmación (reemplaza a confirm) -->
+    <div class="confirm-overlay" v-if="confirmDialog.open" @click.self="resolveConfirm(false)">
+      <div class="confirm-box" role="dialog" aria-modal="true">
+        <p>{{ confirmDialog.message }}</p>
+        <div class="confirm-actions">
+          <button class="btn btn-outline" @click="resolveConfirm(false)">Cancelar</button>
+          <button class="btn btn-primary" @click="resolveConfirm(true)">Confirmar</button>
+        </div>
+      </div>
+    </div>
+
     <ChatbotWidget
       context="empresa"
       :user-name="companyName"
@@ -1371,10 +1388,24 @@ import { insforge } from '../insforgeClient.js'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import ChatbotWidget from './ChatbotWidget.vue'
+import LangSwitch from './LangSwitch.vue'
+
+// ─── Helpers ─────────────────────────────────────────────
+// Pon en true cuando la tabla `products` tenga estas columnas:
+//   subcategory text, brand text, sku text, original_price numeric, min_stock int,
+//   weight numeric, prep_time text, zones text[], bullets text[]
+// Si las activas sin crear las columnas, publicar un producto fallará.
+const SAVE_EXTENDED_PRODUCT_FIELDS = true
+
+const isSameMonth = (d, ref = new Date()) =>
+  d.getFullYear() === ref.getFullYear() && d.getMonth() === ref.getMonth()
+
+const localISODate = (d) =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 
 export default {
   name: 'EmpresaDashboard',
-  components: { ChatbotWidget },
+  components: { ChatbotWidget, LangSwitch },
   emits: ['switch-view'],
 
   data() {
@@ -1383,6 +1414,7 @@ export default {
       companyName: 'Empresa Demo',
       companyEmail: 'empresa@unify.com',
       companyId: null,
+      userId: null,
       companyLogoUrl: null,
       logoUploading: false,
       currentView: 'dashboard',
@@ -1394,7 +1426,7 @@ export default {
       mainTabs: [
         { key: 'dashboard', label: 'Dashboard', icon: 'fas fa-chart-line' },
         { key: 'catalog', label: 'Catálogo', icon: 'fas fa-store' },
-        { key: 'orders', label: 'Pedidos', icon: 'fas fa-box', badge: '12' },
+        { key: 'orders', label: 'Pedidos', icon: 'fas fa-box' },
         { key: 'clients', label: 'Clientes', icon: 'fas fa-users' },
         { key: 'inventory', label: 'Inventario', icon: 'fas fa-warehouse' },
         { key: 'fleet', label: 'Flota', icon: 'fas fa-truck' },
@@ -1469,38 +1501,21 @@ export default {
       // ─── Catálogo publicado ───────────────────────
       publishedProducts: [],
 
-      // ─── Envíos activos ───────────────────────────
-      activeShipmentsList: [
-        { id: '#SHP-001', product: 'Laptop Dell XPS 13', client: 'Ana Martínez', driver: 'Carlos Martínez', driverInitials: 'CM', eta: '12 min', status: 'Enviado' },
-        { id: '#SHP-002', product: 'Monitor LG 24"', client: 'Luis Pérez', driver: 'María González', driverInitials: 'MG', eta: '28 min', status: 'Enviado' },
-        { id: '#SHP-003', product: 'Teclado Mecánico', client: 'José Rodríguez', driver: 'Ana Rodríguez', driverInitials: 'AR', eta: '45 min', status: 'Pendiente' },
-      ],
-
       // ─── Dashboard ────────────────────────────────
-      orders: [
-        { id: '#4521', client: 'Ana Martínez', total: '$45.00', status: 'Pendiente', products: '2 productos', date: '2024-12-15' },
-        { id: '#4522', client: 'Luis Pérez', total: '$128.00', status: 'Enviado', products: '1 producto', date: '2024-12-15' },
-        { id: '#4523', client: 'María López', total: '$67.50', status: 'Entregado', products: '3 productos', date: '2024-12-14' },
-        { id: '#4524', client: 'José Rodríguez', total: '$234.00', status: 'Pendiente', products: '4 productos', date: '2024-12-14' },
-        { id: '#4525', client: 'Carmen Flores', total: '$89.00', status: 'Enviado', products: '2 productos', date: '2024-12-13' },
-        { id: '#4526', client: 'Roberto Silva', total: '$312.00', status: 'Entregado', products: '5 productos', date: '2024-12-13' },
-      ],
-
       realSalesRecords: [], // se llena desde InsForge (tabla sales) al montar — ventas reales por producto
       realReviewsRecords: [], // se llena desde InsForge (tabla reviews) al montar — reseñas reales de mis productos
       showClientDetailModal: false,
       selectedClientDetail: null,
 
-      lowStockProducts: [
-        { id: 1, icon: '💻', name: 'Laptop Dell XPS', stock: 3, sku: 'DELL-XPS-001' },
-        { id: 2, icon: '🖥️', name: 'Monitor 24"', stock: 5, sku: 'MON-24-002' },
-        { id: 3, icon: '🖱️', name: 'Mouse Inalámbrico', stock: 8, sku: 'MOU-INL-003' },
-        { id: 4, icon: '⌨️', name: 'Teclado Mecánico', stock: 4, sku: 'TEC-MEC-004' },
-      ],
-
       notificationsOpen: false,
       lastSeenNotificationsAt: null, // ISO string — pedidos con created_at posterior a esto cuentan como "no leídos"
       salesPollInterval: null,
+      secondsTimer: null,
+      salesSignature: '',
+      orderStatusOverrides: {}, // { [order_ref]: 'Enviado' } mientras se confirma el cambio en la base de datos
+      toasts: [],
+      toastSeq: 0,
+      confirmDialog: { open: false, message: '', resolve: null },
 
       // ─── Chat ──────────────────────────────────────
       mapUpdateSeconds: 0,
@@ -1528,7 +1543,7 @@ export default {
       return new Date().toLocaleDateString('es-ES', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })
     },
     companyInitials() {
-      return this.companyName.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2)
+      return this.companyName.split(' ').filter(Boolean).map(w => w[0]).join('').toUpperCase().slice(0, 2)
     },
     // ─── Notificaciones de compras reales (agrupadas por pedido, desde `sales`) ───
     orderNotifications() {
@@ -1543,7 +1558,7 @@ export default {
             createdAt: row.created_at,
           }
         }
-        groups[row.order_ref].total += row.unit_price || 0
+        groups[row.order_ref].total += Number(row.unit_price) || 0
         groups[row.order_ref].itemCount += 1
       })
       return Object.values(groups)
@@ -1556,6 +1571,62 @@ export default {
     },
     unreadNotificationsCount() {
       return this.orderNotifications.filter((n) => n.isUnread).length
+    },
+    // ─── Pedidos reales (agrupados desde `sales`) ───
+    orders() {
+      const groups = {}
+      this.realSalesRecords.forEach((row) => {
+        const ref = row.order_ref
+        if (!ref) return
+        if (!groups[ref]) {
+          groups[ref] = {
+            id: ref,
+            client: row.client_name || 'Cliente',
+            totalNum: 0,
+            items: [],
+            createdAt: row.created_at,
+            dbStatus: row.status || null,
+          }
+        }
+        const g = groups[ref]
+        g.totalNum += Number(row.unit_price) || 0
+        g.items.push(row.product_title || 'Producto')
+        if (row.created_at && (!g.createdAt || new Date(row.created_at) < new Date(g.createdAt))) {
+          g.createdAt = row.created_at
+        }
+      })
+      return Object.values(groups)
+        .map((g) => ({
+          id: g.id,
+          client: g.client,
+          totalNum: g.totalNum,
+          total: this.money(g.totalNum),
+          products: `${g.items.length} producto${g.items.length === 1 ? '' : 's'}`,
+          productTitles: g.items,
+          createdAt: g.createdAt,
+          date: g.createdAt ? localISODate(new Date(g.createdAt)) : '',
+          status: this.orderStatusOverrides[g.id] || g.dbStatus || 'Pendiente',
+        }))
+        .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+    },
+    mainTabsView() {
+      const pending = this.orders.filter((o) => o.status === 'Pendiente').length
+      return this.mainTabs.map((t) => (t.key === 'orders' ? { ...t, badge: pending > 0 ? String(pending) : '' } : t))
+    },
+    // Envíos activos: pedidos marcados "Enviado" o con ubicación GPS reciente
+    activeShipmentsList() {
+      const live = new Set(this.activeDeliveries.map((d) => String(d.orderId)))
+      return this.orders
+        .filter((o) => o.status === 'Enviado' || live.has(String(o.id)))
+        .map((o) => ({
+          id: o.id,
+          product: o.productTitles.join(', '),
+          client: o.client,
+          driver: live.has(String(o.id)) ? 'En ruta (GPS activo)' : 'Sin ubicación',
+          driverInitials: live.has(String(o.id)) ? '●' : '–',
+          eta: '—',
+          status: o.status,
+        }))
     },
     cartCount() {
       return this.orders.filter(o => o.status === 'Pendiente').length
@@ -1576,8 +1647,8 @@ export default {
       return this.publishedProducts.reduce((a, p) => a + p.stock, 0)
     },
     filteredOrders() {
-      if (this.activeFilter === 'Todos') return this.orders
-      return this.orders.filter(o => o.status === this.activeFilter)
+      const list = this.activeFilter === 'Todos' ? this.orders : this.orders.filter(o => o.status === this.activeFilter)
+      return list.slice(0, 8) // "Pedidos recientes": solo los últimos 8
     },
     filteredOrdersFull() {
       let result = this.orders
@@ -1588,17 +1659,26 @@ export default {
       if (this.orderStatusFilter) {
         result = result.filter(o => o.status === this.orderStatusFilter)
       }
+      const now = new Date()
       if (this.orderDateFilter === 'today') {
-        const today = new Date().toISOString().slice(0, 10)
+        const today = localISODate(now)
         result = result.filter(o => o.date === today)
-      }
-      if (this.orderDateFilter === 'week') {
-        result = result.slice(0, 4)
+      } else if (this.orderDateFilter === 'week') {
+        const weekAgo = now.getTime() - 7 * 24 * 60 * 60 * 1000
+        result = result.filter(o => o.createdAt && new Date(o.createdAt).getTime() >= weekAgo)
+      } else if (this.orderDateFilter === 'month') {
+        result = result.filter(o => o.createdAt && isSameMonth(new Date(o.createdAt), now))
       }
       return result
     },
     sortedCatalog() {
       let result = [...this.publishedProducts]
+      const term = this.catalogSearch.trim().toLowerCase()
+      if (term) {
+        result = result.filter(p => (p.title || '').toLowerCase().includes(term) || (p.category || '').toLowerCase().includes(term))
+      }
+      if (this.catalogCategoryFilter) result = result.filter(p => p.category === this.catalogCategoryFilter)
+      if (this.catalogStatusFilter) result = result.filter(p => p.status === this.catalogStatusFilter)
       if (this.catalogSort === 'recent') {
         // mantener orden
       } else if (this.catalogSort === 'price-low') {
@@ -1613,15 +1693,15 @@ export default {
       return result
     },
     salesData() {
-      // Últimos 6 días (Lun-Sáb de la semana actual), ingresos reales desde `sales`
+      // Semana actual (Lun-Dom), ingresos reales desde `sales`
       const dayLabels = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado']
       const now = new Date()
       const startOfWeek = new Date(now)
-      startOfWeek.setDate(now.getDate() - now.getDay() + 1) // lunes de esta semana
+      startOfWeek.setDate(now.getDate() - ((now.getDay() + 6) % 7)) // lunes de esta semana (también si hoy es domingo)
       startOfWeek.setHours(0, 0, 0, 0)
 
       const days = []
-      for (let i = 0; i < 6; i++) {
+      for (let i = 0; i < 7; i++) {
         const d = new Date(startOfWeek)
         d.setDate(startOfWeek.getDate() + i)
         days.push({ key: d.toDateString(), label: dayLabels[d.getDay()], amount: 0 })
@@ -1647,7 +1727,7 @@ export default {
       const refs = this.realSalesRecords
         .filter((s) => {
           const d = new Date(s.created_at)
-          return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth()
+          return isSameMonth(d, now)
         })
         .map((s) => s.order_ref)
       return new Set(refs).size
@@ -1698,7 +1778,7 @@ export default {
             clientId: g.clientId,
             name: g.name,
             avatarUrl: g.avatarUrl,
-            initials: g.name.split(' ').map((w) => w[0]).join('').toUpperCase().slice(0, 2),
+            initials: g.name.split(' ').filter(Boolean).map((w) => w[0]).join('').toUpperCase().slice(0, 2),
             orderCount: g.orderRefs.size,
             totalSpent: g.totalSpent,
             lastPurchase: g.lastPurchaseDate ? g.lastPurchaseDate.toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' }) : '—',
@@ -1743,7 +1823,7 @@ export default {
         {
           icon: '',
           label: 'Ventas del mes',
-          value: `$${this.revenueThisMonth.toFixed(2)}`,
+          value: this.money(this.revenueThisMonth),
           color: 'var(--green-600)',
           trend: this.revenueLastMonth > 0 ? `${this.revenueChangePercent >= 0 ? '+' : ''}${this.revenueChangePercent}% vs mes anterior` : 'Sin datos del mes anterior',
           trendUp: this.revenueChangePercent >= 0,
@@ -1830,7 +1910,7 @@ export default {
       return this.realSalesRecords
         .filter((s) => {
           const d = new Date(s.created_at)
-          return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth()
+          return isSameMonth(d, now)
         })
         .reduce((sum, s) => sum + (Number(s.unit_price) || 0), 0)
     },
@@ -1840,7 +1920,7 @@ export default {
       return this.realSalesRecords
         .filter((s) => {
           const d = new Date(s.created_at)
-          return d.getFullYear() === lastMonth.getFullYear() && d.getMonth() === lastMonth.getMonth()
+          return isSameMonth(d, lastMonth)
         })
         .reduce((sum, s) => sum + (Number(s.unit_price) || 0), 0)
     },
@@ -1986,6 +2066,10 @@ export default {
     },
   },
 
+  created() {
+    this.userIdPromise = null // no reactivo: evita pedir el usuario varias veces a la vez
+  },
+
   mounted() { 
     this.loadCompanyProfile()
     this.loadMyProducts()
@@ -1997,13 +2081,13 @@ export default {
     document.addEventListener('click', this.closeNotificationsOutside)
     // Contador de segundos desde la última actualización real del mapa de flota
     // (se reinicia a 0 cada vez que loadActiveDeliveries() trae datos nuevos)
-    setInterval(() => {
+    this.secondsTimer = setInterval(() => {
       this.mapUpdateSeconds = (this.mapUpdateSeconds % 60) + 1
     }, 1000)
     // Revisa cada 15s si hay ventas nuevas, para que la campana se actualice
     // sin que la empresa tenga que recargar la página cuando un cliente compra.
     this.salesPollInterval = setInterval(() => {
-      this.loadSalesData()
+      if (document.visibilityState === 'visible') this.loadSalesData()
     }, 15000)
   },
 
@@ -2013,10 +2097,48 @@ export default {
     if (this.conversationsPollInterval) clearInterval(this.conversationsPollInterval)
     if (this.clientChatPollInterval) clearInterval(this.clientChatPollInterval)
     if (this.salesPollInterval) clearInterval(this.salesPollInterval)
+    if (this.secondsTimer) clearInterval(this.secondsTimer)
     this.teardownFleetMap()
   },
 
   methods: {
+    // ─── Utilidades ───
+    money(n) {
+      return Number(n || 0).toLocaleString('en-US', { style: 'currency', currency: 'USD' })
+    },
+    getUserId() {
+      if (this.userId) return Promise.resolve(this.userId)
+      if (!this.userIdPromise) {
+        this.userIdPromise = insforge.auth.getCurrentUser()
+          .then(({ data, error }) => {
+            if (error || !data?.user?.id) return null
+            this.userId = data.user.id
+            return this.userId
+          })
+          .catch(() => null)
+          .finally(() => { this.userIdPromise = null })
+      }
+      return this.userIdPromise
+    },
+    notify(message, type) {
+      const kind = type || (/^[✅🚀💾]/u.test(message) ? 'success'
+        : /no se pudo|error|ocurri|inicia sesión|por favor|agrega al menos|supera|formato no/i.test(message) ? 'error'
+        : 'info')
+      const id = ++this.toastSeq
+      this.toasts.push({ id, message, type: kind })
+      setTimeout(() => { this.toasts = this.toasts.filter((t) => t.id !== id) }, 4500)
+    },
+    askConfirm(message) {
+      return new Promise((resolve) => {
+        this.confirmDialog = { open: true, message, resolve }
+      })
+    },
+    resolveConfirm(result) {
+      const done = this.confirmDialog.resolve
+      this.confirmDialog = { open: false, message: '', resolve: null }
+      if (done) done(result)
+    },
+
     // ─── Mapa real de flota (Leaflet + driver_locations) ───
     initFleetMap() {
       const mapEl = this.$refs.fleetMapEl
@@ -2036,7 +2158,9 @@ export default {
 
       this.loadActiveDeliveries()
       if (this.fleetPollInterval) clearInterval(this.fleetPollInterval)
-      this.fleetPollInterval = setInterval(() => this.loadActiveDeliveries(), 5000)
+      this.fleetPollInterval = setInterval(() => {
+        if (document.visibilityState === 'visible') this.loadActiveDeliveries()
+      }, 5000)
     },
 
     teardownFleetMap() {
@@ -2053,10 +2177,20 @@ export default {
 
     async loadActiveDeliveries() {
       try {
-        const { data: locations, error: locError } = await insforge.database
-          .from('driver_locations')
-          .select('*')
-          .order('created_at', { ascending: false })
+        // Solo pedidos de esta empresa y ubicaciones de los últimos 10 minutos
+        const companyOrderIds = new Set(this.companyOrdersList.map((o) => String(o.orderId)))
+        if (companyOrderIds.size === 0) {
+          if (this.activeDeliveries.length) {
+            this.activeDeliveries = []
+            this.updateFleetMarkers()
+          }
+          return
+        }
+        const sinceIso = new Date(Date.now() - 10 * 60 * 1000).toISOString()
+        let query = insforge.database.from('driver_locations').select('*')
+        if (typeof query.gte === 'function') query = query.gte('created_at', sinceIso)
+        if (typeof query.in === 'function') query = query.in('order_id', [...companyOrderIds])
+        const { data: locations, error: locError } = await query.order('created_at', { ascending: false })
 
         if (locError) {
           console.warn('No se pudieron cargar las ubicaciones activas:', locError)
@@ -2067,6 +2201,7 @@ export default {
         const tenMinutesAgo = Date.now() - 10 * 60 * 1000
         const latestByOrder = {}
         ;(locations || []).forEach((row) => {
+          if (!companyOrderIds.has(String(row.order_id))) return
           if (latestByOrder[row.order_id]) return
           const rowTime = row.created_at ? new Date(row.created_at).getTime() : 0
           if (rowTime < tenMinutesAgo) return
@@ -2144,8 +2279,8 @@ export default {
       if (!link) return
       navigator.clipboard
         .writeText(link)
-        .then(() => alert('✅ Link copiado. Compártelo con el repartidor para que envíe su ubicación.'))
-        .catch(() => alert('No se pudo copiar automáticamente. Selecciona el texto y cópialo a mano.'))
+        .then(() => this.notify('✅ Link copiado. Compártelo con el repartidor para que envíe su ubicación.'))
+        .catch(() => this.notify('No se pudo copiar automáticamente. Selecciona el texto y cópialo a mano.'))
     },
 
     // ─── Ocultar pedidos de la lista de "Link de seguimiento" (solo visual, no borra la venta) ───
@@ -2185,6 +2320,7 @@ export default {
         const u = data.user
         this.companyEmail = u.email || 'empresa@unify.com'
         this.companyId = u.id || null
+        this.userId = u.id || null
 
         // El nombre comercial real se guarda en company_profiles (formulario de detalles de empresa),
         // no en los metadatos del usuario de auth.
@@ -2207,15 +2343,15 @@ export default {
       if (!file) return
 
       if (!file.type.startsWith('image/')) {
-        alert('Por favor selecciona un archivo de imagen.')
+        this.notify('Por favor selecciona un archivo de imagen.')
         return
       }
       if (file.size > 3 * 1024 * 1024) {
-        alert('La imagen debe pesar menos de 3MB.')
+        this.notify('La imagen debe pesar menos de 3MB.')
         return
       }
       if (!this.companyId) {
-        alert('Inicia sesión de nuevo para poder actualizar el logo.')
+        this.notify('Inicia sesión de nuevo para poder actualizar el logo.')
         return
       }
 
@@ -2229,7 +2365,7 @@ export default {
           .upload(key, file)
 
         if (uploadError) {
-          alert('No se pudo subir el logo: ' + (uploadError.message || 'error desconocido'))
+          this.notify('No se pudo subir el logo: ' + (uploadError.message || 'error desconocido'))
           return
         }
 
@@ -2242,14 +2378,14 @@ export default {
           .eq('id', this.companyId)
 
         if (dbError) {
-          alert('El logo se subió, pero no se pudo guardar: ' + (dbError.message || ''))
+          this.notify('El logo se subió, pero no se pudo guardar: ' + (dbError.message || ''))
           return
         }
 
         this.companyLogoUrl = fullUrl
       } catch (err) {
         console.error('Error subiendo el logo:', err)
-        alert('Ocurrió un error inesperado subiendo el logo.')
+        this.notify('Ocurrió un error inesperado subiendo el logo.')
       } finally {
         this.logoUploading = false
       }
@@ -2261,7 +2397,7 @@ export default {
       this.loadClientConversations()
       if (this.conversationsPollInterval) clearInterval(this.conversationsPollInterval)
       this.conversationsPollInterval = setInterval(() => {
-        this.loadClientConversations()
+        if (document.visibilityState === 'visible') this.loadClientConversations()
       }, 5000)
     },
 
@@ -2317,7 +2453,7 @@ export default {
       this.loadClientChatMessages()
       if (this.clientChatPollInterval) clearInterval(this.clientChatPollInterval)
       this.clientChatPollInterval = setInterval(() => {
-        this.loadClientChatMessages()
+        if (document.visibilityState === 'visible') this.loadClientChatMessages()
       }, 4000)
     },
 
@@ -2362,14 +2498,14 @@ export default {
           text,
         }])
         if (error) {
-          alert('No se pudo enviar el mensaje: ' + (error.message || 'error desconocido'))
+          this.notify('No se pudo enviar el mensaje: ' + (error.message || 'error desconocido'))
           return
         }
         await this.loadClientChatMessages()
         await this.loadClientConversations()
       } catch (err) {
         console.warn('Error inesperado enviando mensaje:', err)
-        alert('Error inesperado enviando el mensaje.')
+        this.notify('Error inesperado enviando el mensaje.')
       } finally {
         this.clientChatLoading = false
       }
@@ -2422,28 +2558,27 @@ export default {
     },
     async signOut() {
       try { await insforge.auth.signOut() } catch(e) {}
+      this.userId = null
       try { localStorage.removeItem('userRole') } catch(e) {}
       try { localStorage.removeItem('userRoleFor') } catch(e) {}
       this.$emit('switch-view', 'login')
     },
 
     // ─── Búsqueda ──────────────────────────────
-    performSearch() {
-      // Solo se activa el dropdown
-    },
     closeSearchResults() {
       setTimeout(() => {
         this.searchFocused = false
       }, 200)
     },
-    navigateTo(view, payload) {
+    navigateTo(view, payload = {}) {
       this.currentView = view
       if (view === 'catalog' && payload.product) {
-        // Podríamos abrir detalle del producto
-        alert('Producto seleccionado: ' + payload.product.title)
+        this.catalogTab = 'products'
+        this.catalogSearch = payload.product.title || ''
       } else if (view === 'orders' && payload.order) {
-        // Podríamos ir al pedido
-        alert('Pedido seleccionado: ' + payload.order.id)
+        this.orderSearch = String(payload.order.id)
+        this.orderStatusFilter = ''
+        this.orderDateFilter = 'all'
       }
       this.globalSearch = ''
       this.searchFocused = false
@@ -2455,20 +2590,33 @@ export default {
       return '⭐'.repeat(Math.round(num)) + '☆'.repeat(5 - Math.round(num))
     },
     viewProductDetail(p) {
-      alert(`📦 ${p.title}\nPrecio: $${p.price.toFixed(2)}\nStock: ${p.stock} uds\n⭐ ${p.rating} (${p.reviews || 0} reseñas)\nEstado: ${p.status}`)
+      this.notify(`📦 ${p.title}\nPrecio: ${this.money(p.price)}\nStock: ${p.stock} uds\n⭐ ${p.rating} (${p.reviews || 0} reseñas)\nEstado: ${p.status}`)
     },
     viewProductAnalytics(p) {
-      alert(`📊 Análisis de "${p.title}"\nVentas totales: ${p.sales || 0}\nRating: ${p.rating}\nStock: ${p.stock} uds`)
+      this.notify(`📊 Análisis de "${p.title}"\nVentas totales: ${p.sales || 0}\nRating: ${p.rating}\nStock: ${p.stock} uds`)
     },
     editProduct(p) {
+      this.resetNewProduct()
       this.catalogTab = 'new'
       this.editingProductId = p.id
-      this.newProduct.title = p.title || ''
-      this.newProduct.category = p.category || ''
-      this.newProduct.description = p.description || ''
-      this.newProduct.price = p.price
-      this.newProduct.stock = p.stock
-      this.newProduct.previewImages = (Array.isArray(p.images) && p.images.length > 0)
+      const np = this.newProduct
+      np.title = p.title || ''
+      np.category = p.category || ''
+      np.description = p.description || ''
+      np.price = p.price
+      np.stock = p.stock
+      np.subcategory = p.subcategory || ''
+      np.brand = p.brand || ''
+      np.sku = p.sku || ''
+      np.originalPrice = p.original_price ?? null
+      np.minStock = p.min_stock ?? 5
+      np.weight = p.weight ?? null
+      np.prepTime = p.prep_time ?? '2'
+      if (Array.isArray(p.zones) && p.zones.length) np.zones = [...p.zones]
+      if (Array.isArray(p.bullets) && p.bullets.length) np.bullets = [...p.bullets]
+      const logisticsOption = this.logisticsOptions.find((o) => o.title === p.logistics)
+      if (logisticsOption) np.logistics = logisticsOption.key
+      np.previewImages = (Array.isArray(p.images) && p.images.length > 0)
         ? [...p.images]
         : (p.image ? [p.image] : [])
     },
@@ -2480,7 +2628,7 @@ export default {
         const { error } = await insforge.database.from('products').update({ status: newStatus }).eq('id', p.id)
         if (error) {
           p.status = previousStatus
-          alert('No se pudo actualizar el estado del producto.')
+          this.notify('No se pudo actualizar el estado del producto.')
         }
       } catch (err) {
         p.status = previousStatus
@@ -2488,17 +2636,17 @@ export default {
       }
     },
     async deleteProductConfirm(p) {
-      if (!confirm(`¿Eliminar "${p.title}"? Esta acción no se puede deshacer.`)) return
+      if (!(await this.askConfirm(`¿Eliminar "${p.title}"? Esta acción no se puede deshacer.`))) return
       try {
         const { error } = await insforge.database.from('products').delete().eq('id', p.id)
         if (error) {
-          alert('No se pudo eliminar el producto.')
+          this.notify('No se pudo eliminar el producto.')
           return
         }
         await this.loadMyProducts()
       } catch (err) {
         console.error('Error eliminando producto:', err)
-        alert('Error inesperado al eliminar el producto.')
+        this.notify('Error inesperado al eliminar el producto.')
       }
     },
 
@@ -2536,7 +2684,8 @@ export default {
 
       this.uploadingImage = true
       try {
-        const path = `products/${Date.now()}-${file.name}`
+        const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_')
+        const path = `products/${Date.now()}-${safeName}`
         const { data, error } = await insforge.storage.from('product-images').upload(path, file)
 
         if (error) {
@@ -2598,9 +2747,8 @@ export default {
     },
     async loadMyProducts() {
       try {
-        const { data: userData, error: userError } = await insforge.auth.getCurrentUser()
-        const userId = userData?.user?.id
-        if (userError || !userId) return
+        const userId = await this.getUserId()
+        if (!userId) return
 
         const { data, error } = await insforge.database
           .from('products')
@@ -2617,9 +2765,8 @@ export default {
     },
     async loadSalesData() {
       try {
-        const { data: userData, error: userError } = await insforge.auth.getCurrentUser()
-        const userId = userData?.user?.id
-        if (userError || !userId) return
+        const userId = await this.getUserId()
+        if (!userId) return
 
         const { data, error } = await insforge.database
           .from('sales')
@@ -2628,7 +2775,12 @@ export default {
           .order('created_at', { ascending: false })
 
         if (!error && data) {
-          this.realSalesRecords = data
+          // Solo actualiza si algo cambió (evita recalcular todo el panel cada 15 s)
+          const signature = JSON.stringify(data)
+          if (signature !== this.salesSignature) {
+            this.salesSignature = signature
+            this.realSalesRecords = data
+          }
         }
       } catch (err) {
         console.warn('Error cargando datos de ventas:', err)
@@ -2648,9 +2800,8 @@ export default {
     },
     async loadReviewsData() {
       try {
-        const { data: userData, error: userError } = await insforge.auth.getCurrentUser()
-        const userId = userData?.user?.id
-        if (userError || !userId) return
+        const userId = await this.getUserId()
+        if (!userId) return
 
         const { data, error } = await insforge.database
           .from('reviews')
@@ -2667,10 +2818,9 @@ export default {
     },
     async saveProduct(status) {
       try {
-        const { data: userData, error: userError } = await insforge.auth.getCurrentUser()
-        const userId = userData?.user?.id
-        if (userError || !userId) {
-          alert('No hay sesión activa. Inicia sesión de nuevo.')
+        const userId = await this.getUserId()
+        if (!userId) {
+          this.notify('No hay sesión activa. Inicia sesión de nuevo.')
           return
         }
 
@@ -2689,6 +2839,21 @@ export default {
           images: this.newProduct.previewImages,
         }
 
+        if (SAVE_EXTENDED_PRODUCT_FIELDS) {
+          const np = this.newProduct
+          Object.assign(payload, {
+            subcategory: np.subcategory,
+            brand: np.brand,
+            sku: np.sku,
+            original_price: np.originalPrice,
+            min_stock: np.minStock,
+            weight: np.weight,
+            prep_time: np.prepTime,
+            zones: np.zones,
+            bullets: np.bullets.filter((b) => b.trim()),
+          })
+        }
+
         let error
         if (this.editingProductId) {
           ;({ error } = await insforge.database.from('products').update(payload).eq('id', this.editingProductId))
@@ -2700,11 +2865,11 @@ export default {
         }
 
         if (error) {
-          alert('No se pudo guardar el producto: ' + (error.message || 'error desconocido'))
+          this.notify('No se pudo guardar el producto: ' + (error.message || 'error desconocido'))
           return
         }
 
-        alert(
+        this.notify(
           status === 'Activo'
             ? `🚀 ¡"${payload.title}" publicado con éxito!`
             : '💾 Borrador guardado correctamente.'
@@ -2714,18 +2879,18 @@ export default {
         this.catalogTab = 'products'
       } catch (err) {
         console.error('Error guardando producto:', err)
-        alert('Error inesperado al guardar el producto.')
+        this.notify('Error inesperado al guardar el producto.')
       }
     },
     saveDraft() {
       if (!this.newProduct.title) {
-        alert('Agrega al menos un título antes de guardar el borrador.')
+        this.notify('Agrega al menos un título antes de guardar el borrador.')
         return
       }
       this.saveProduct('Borrador')
     },
     previewProduct() {
-      alert('👁️ Abriendo vista previa del listing…')
+      this.notify('La vista previa todavía no está disponible.')
     },
     async publishProduct() {
       if (!this.canPublish) return
@@ -2734,26 +2899,48 @@ export default {
 
     // ─── Pedidos ────────────────────────────────
     viewOrder(o) {
-      alert(`📋 Pedido ${o.id}\nCliente: ${o.client}\nTotal: ${o.total}\nEstado: ${o.status}`)
+      this.notify(`📋 Pedido ${o.id}\nCliente: ${o.client}\nProductos: ${o.productTitles.join(', ')}\nTotal: ${o.total}\nEstado: ${o.status}`)
     },
-    updateOrderStatus(order, newStatus) {
-      order.status = newStatus
-      alert(`✅ Pedido ${order.id} actualizado a "${newStatus}"`)
+    async updateOrderStatus(order, newStatus) {
+      const ref = order.id
+      const previous = this.orderStatusOverrides[ref]
+      this.orderStatusOverrides = { ...this.orderStatusOverrides, [ref]: newStatus } // actualización optimista
+      try {
+        const userId = await this.getUserId()
+        if (!userId) throw new Error('Sin sesión activa')
+        const { error } = await insforge.database
+          .from('sales')
+          .update({ status: newStatus })
+          .eq('order_ref', ref)
+          .eq('seller_id', userId)
+        if (error) throw error
+        await this.loadSalesData()
+        const next = { ...this.orderStatusOverrides }
+        delete next[ref] // desde ahora manda el estado guardado en la base de datos
+        this.orderStatusOverrides = next
+        this.notify(`✅ Pedido ${ref} actualizado a "${newStatus}"`)
+      } catch (err) {
+        const next = { ...this.orderStatusOverrides }
+        if (previous === undefined) delete next[ref]
+        else next[ref] = previous
+        this.orderStatusOverrides = next
+        console.warn('No se pudo actualizar el estado del pedido:', err)
+        this.notify('No se pudo guardar el estado del pedido. Revisa que la tabla sales tenga la columna status y permiso de actualización.', 'error')
+      }
     },
     getOrderStatusClass(s) {
-      return { 'Pendiente': 'status-pending', 'Enviado': 'status-shipped', 'Entregado': 'status-delivered', 'Cancelado': 'status-pending' }[s] || ''
+      return { 'Pendiente': 'status-pending', 'Enviado': 'status-shipped', 'Entregado': 'status-delivered', 'Cancelado': 'status-cancelled' }[s] || ''
     },
     restock(p) {
-      alert(`📦 Solicitando reabastecimiento: ${p.name}`)
-      p.stock += 10
+      this.currentView = 'catalog'
+      this.editProduct(p)
+      this.notify(`Actualiza el stock de "${p.title}" y guarda los cambios.`)
     },
     viewTracking(s) {
-      alert(`🗺️ Abriendo mapa en tiempo real para: ${s.product}`)
-      this.currentView = 'messages'
+      this.openChatForOrder({ id: s.id })
     },
     openChat(s) {
-      this.currentView = 'messages'
-      this.messagesTab = 'drivers'
+      this.openChatForOrder({ id: s.id })
     },
     openChatForOrder(order) {
       this.currentView = 'messages'
@@ -5039,4 +5226,30 @@ footer {
   .published-grid { grid-template-columns: 1fr; }
   .inventory-stats { grid-template-columns: 1fr 1fr; }
 }
+
+/* ══════════════════════════════════════════
+   AVISOS (toast) Y CONFIRMACIÓN
+══════════════════════════════════════════ */
+.status-cancelled { background: #fee2e2; color: #dc2626; }
+.toast-stack {
+  position: fixed; right: 1rem; bottom: 1rem; z-index: 3000;
+  display: flex; flex-direction: column; gap: .5rem; max-width: min(380px, calc(100vw - 2rem));
+}
+.toast-item {
+  background: var(--text-dark); color: #fff; padding: .75rem 1rem; border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lg); font-size: .9rem; line-height: 1.4; white-space: pre-line;
+  border-left: 4px solid var(--sky-400);
+}
+.toast-success { border-left-color: var(--green-400); }
+.toast-error { border-left-color: #dc2626; }
+.confirm-overlay {
+  position: fixed; inset: 0; z-index: 3100; background: rgba(0, 0, 0, .45);
+  display: flex; align-items: center; justify-content: center; padding: 1rem;
+}
+.confirm-box {
+  background: #fff; border-radius: var(--radius-lg); padding: 1.5rem; width: min(420px, 100%);
+  box-shadow: var(--shadow-lg);
+}
+.confirm-box p { color: var(--text-dark); margin-bottom: 1.25rem; line-height: 1.5; }
+.confirm-actions { display: flex; justify-content: flex-end; gap: .5rem; }
 </style>
