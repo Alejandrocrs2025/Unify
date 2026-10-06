@@ -1601,8 +1601,8 @@ export default {
           client: g.client,
           totalNum: g.totalNum,
           total: this.money(g.totalNum),
-          products: `${g.items.length} producto${g.items.length === 1 ? '' : 's'}`,
-          productTitles: g.items,
+          products: `${g.items.length} unidad${g.items.length === 1 ? '' : 'es'}`,
+          productTitles: this.groupTitles(g.items),
           createdAt: g.createdAt,
           date: g.createdAt ? localISODate(new Date(g.createdAt)) : '',
           status: this.orderStatusOverrides[g.id] || g.dbStatus || 'Pendiente',
@@ -2103,6 +2103,12 @@ export default {
 
   methods: {
     // ─── Utilidades ───
+    // ['Moto','Moto','Casco'] -> ['Moto ×2','Casco'] (el checkout guarda una fila por unidad)
+    groupTitles(items) {
+      const counts = {}
+      items.forEach((t) => { counts[t] = (counts[t] || 0) + 1 })
+      return Object.entries(counts).map(([t, n]) => (n > 1 ? `${t} ×${n}` : t))
+    },
     money(n) {
       return Number(n || 0).toLocaleString('en-US', { style: 'currency', currency: 'USD' })
     },
@@ -2915,6 +2921,9 @@ export default {
           .eq('seller_id', userId)
         if (error) throw error
         await this.loadSalesData()
+        // Verifica que de verdad se guardó: sin permiso UPDATE la base de datos puede no dar error y simplemente no modificar nada
+        const saved = this.realSalesRecords.find((r) => r.order_ref === ref)
+        if (!saved || saved.status !== newStatus) throw new Error('El cambio no se guardó (revisa la política UPDATE de sales)')
         const next = { ...this.orderStatusOverrides }
         delete next[ref] // desde ahora manda el estado guardado en la base de datos
         this.orderStatusOverrides = next

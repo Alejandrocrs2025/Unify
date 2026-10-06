@@ -6,7 +6,7 @@
     <header>
       <div class="brand">
         <img src="/img/logo-unify.png" alt="Unify Logo" />
-        <h1><span>U</span>nify</h1>
+        <h1><span translate="no">U</span>nify</h1>
       </div>
       <nav class="navbar">
         <ul>
@@ -29,6 +29,7 @@
             <i class="fas fa-shopping-cart"></i>
             <span v-if="cartItemCount > 0" class="cart-nav-badge">{{ cartItemCount }}</span>
           </li>
+          <li class="lang-nav-item"><LangSwitch /></li>
           <li @click="signOut" class="logout-item">
             <i class="fas fa-sign-out-alt"></i> Cerrar sesión
           </li>
@@ -42,7 +43,7 @@
       ════════════════════════════════════════ -->
       <div class="profile-header">
         <div class="profile-info">
-          <h2>¡Hola, {{ userName }}! 👋</h2>
+          <h2>¡Hola, <span translate="no">{{ userName }}</span>!</h2>
           <p>Bienvenido a Unify - Tu tienda favorita</p>
         </div>
         <div class="profile-points">
@@ -80,7 +81,7 @@
             </div>
             <div class="product-info">
               <div class="product-title">{{ product.title }}</div>
-              <div class="product-price">${{ product.price.toFixed(2) }}</div>
+              <div class="product-price">{{ money(product.price) }}</div>
               <div class="product-seller">{{ product.seller || 'Unify' }}</div>
               <div class="product-rating">
                 <span v-for="n in 5" :key="n" :class="{ 'star-filled': n <= Math.round(product.rating || 0) }">★</span>
@@ -153,7 +154,7 @@
               </div>
               <div class="product-info">
                 <div class="product-title">{{ product.title }}</div>
-                <div class="product-price">${{ product.price.toFixed(2) }}</div>
+                <div class="product-price">{{ money(product.price) }}</div>
                 <div class="product-seller">{{ product.seller || 'Unify' }}</div>
                 <div class="product-rating">
                   <span v-for="n in 5" :key="n" :class="{ 'star-filled': n <= Math.round(product.rating || 0) }">★</span>
@@ -174,14 +175,17 @@
       <template v-if="currentView === 'orders'">
         <h3 style="margin-bottom: 1rem;"><i class="fas fa-box-open"></i> Mis pedidos recientes</h3>
         <div class="orders-list">
+          <p v-if="!ordersLoading && orders.length === 0" style="text-align:center; padding: 2rem; color: var(--text-muted);">
+            Aún no tienes pedidos. ¡Explora los productos y haz tu primera compra!
+          </p>
           <div v-for="order in orders" :key="order.id" class="order-item">
             <div class="order-info">
               <strong>{{ order.id }}</strong>
               <span>{{ order.date }}</span>
             </div>
             <div class="order-info">
-              <span>${{ order.total.toFixed(2) }}</span>
-              <span class="status-delivered" :class="getStatusClass(order.status)">
+              <span>{{ money(order.total) }}</span>
+              <span :class="getStatusClass(order.status)">
                 {{ order.status }}
               </span>
               <button class="btn-outline btn-sm" @click="viewOrder(order.id)">Ver detalle</button>
@@ -222,7 +226,7 @@
           <div class="tracking-chat-panel">
             <div class="tracking-order-info">
               <h4>📦 {{ trackingOrder.id }}</h4>
-              <p><strong>Total:</strong> ${{ trackingOrder.total.toFixed(2) }}</p>
+              <p><strong>Total:</strong> {{ money(trackingOrder.total) }}</p>
               <p><strong>Estado:</strong> <span :class="getStatusClass(trackingOrder.status)">{{ trackingOrder.status }}</span></p>
               <p><strong>Repartidor:</strong> {{ trackingDriver ? trackingDriver.name : 'Asignando...' }}</p>
             </div>
@@ -231,7 +235,7 @@
             <div class="mini-chat-wrap" v-if="trackingDriver">
               <div class="mini-chat-header">
                 <h4><i class="fas fa-comments"></i> Chat con {{ trackingDriver.name }}</h4>
-                <span class="chat-online-dot">🟢 En línea</span>
+                <span class="chat-online-dot">{{ driverHasRealLocation ? '🟢 En ruta' : '⚪ Sin ubicación todavía' }}</span>
               </div>
               <div class="chat-messages-box" ref="chatBoxMessages">
                 <div
@@ -417,7 +421,7 @@
                 <span class="qty-value">{{ item.quantity }}</span>
                 <button class="qty-btn" @click="incrementQty(item)" :disabled="item.quantity >= item.stock">+</button>
               </div>
-              <span class="cart-item-subtotal">${{ (item.price * item.quantity).toFixed(2) }}</span>
+              <span class="cart-item-subtotal">{{ money((item.price * item.quantity)) }}</span>
               <button class="btn-outline btn-sm" @click="removeFromCart(item)">Eliminar</button>
             </div>
           </div>
@@ -427,7 +431,7 @@
           <p>Tu carrito está vacío</p>
         </div>
         <div class="cart-total" v-if="cart.length > 0">
-          Total: ${{ cartTotal.toFixed(2) }}
+          Total: {{ money(cartTotal) }}
         </div>
         <button class="btn-primary" style="margin-top: 1rem; width: 100%;" @click="openCheckoutModal" :disabled="cart.length === 0">
           Proceder al pago →
@@ -472,7 +476,7 @@
                 <span v-for="n in 5" :key="n" :class="{ 'star-filled': n <= Math.round(selectedProduct.rating || 0) }">★</span>
                 <span class="rating-count">({{ selectedProduct.reviews || 0 }} reseñas)</span>
               </div>
-              <div class="detail-price">${{ selectedProduct.price.toFixed(2) }}</div>
+              <div class="detail-price">{{ money(selectedProduct.price) }}</div>
               <p class="detail-description">{{ selectedProduct.description || 'Descripción no disponible.' }}</p>
               <p class="detail-stock" v-if="selectedProduct.stock !== undefined">
                 <span :class="selectedProduct.stock > 0 ? 'in-stock' : 'out-of-stock'">
@@ -574,16 +578,16 @@
         <div class="modal-content checkout-modal">
           <button class="modal-close" @click="closeCheckoutModal">&times;</button>
           <h2>💳 Procesar pago</h2>
-          <p class="checkout-total">Total a pagar: <strong>${{ cartTotal.toFixed(2) }}</strong></p>
+          <p class="checkout-total">Total a pagar: <strong>{{ money(cartTotal) }}</strong></p>
 
           <div class="points-redeem-box" v-if="userPoints >= 100">
             <p class="points-redeem-label">⭐ Tienes {{ userPoints }} puntos acumulados</p>
             <div class="points-redeem-row">
               <button class="pts-btn" @click="pointsToRedeem = Math.max(0, pointsToRedeem - 1)" :disabled="pointsToRedeem === 0">−</button>
-              <span>{{ pointsToRedeem * 100 }} pts → ${{ pointsDiscount.toFixed(2) }} de descuento</span>
+              <span>{{ pointsToRedeem * 100 }} pts → {{ money(pointsDiscount) }} de descuento</span>
               <button class="pts-btn" @click="pointsToRedeem = Math.min(maxRedeemableBlocks, pointsToRedeem + 1)" :disabled="pointsToRedeem >= maxRedeemableBlocks">+</button>
             </div>
-            <p class="checkout-total-final">Total con descuento: <strong>${{ finalCheckoutTotal.toFixed(2) }}</strong></p>
+            <p class="checkout-total-final">Total con descuento: <strong>{{ money(finalCheckoutTotal) }}</strong></p>
           </div>
 
           <div class="address-select-box">
@@ -633,15 +637,16 @@
             <p>Serás redirigido a PayPal para completar el pago.</p>
           </div>
           <div class="payment-form" v-if="selectedPayment === 'transfer'">
-            <p>Realiza la transferencia a la cuenta: <strong>Unify Bank - ES91 2100 0418 4502 0005 1332</strong></p>
-            <p>Referencia: <strong>#{{ generateOrderRef() }}</strong></p>
+            <p>Realiza la transferencia a la cuenta: <strong>{{ transferAccount }}</strong></p>
+            <p>Referencia: <strong>{{ pendingOrderRef }}</strong></p>
           </div>
           <div class="payment-form" v-if="selectedPayment === 'cash'">
             <p>Pagarás en efectivo directamente al repartidor cuando recibas tu pedido.</p>
-            <p>Ten el monto exacto listo: <strong>${{ finalCheckoutTotal.toFixed(2) }}</strong></p>
+            <p>Ten el monto exacto listo: <strong>{{ money(finalCheckoutTotal) }}</strong></p>
           </div>
-          <button class="btn-primary" style="width: 100%; margin-top: 1rem;" @click="confirmPayment" :disabled="!selectedPayment || (addresses.length > 0 && !selectedAddressId)">
-            Confirmar pago
+          <p v-if="!selectedAddressId" class="report-empty-hint" style="margin-top: .75rem;">Elige o agrega una dirección de entrega para continuar.</p>
+          <button class="btn-primary" style="width: 100%; margin-top: 1rem;" @click="confirmPayment" :disabled="!selectedPayment || !selectedAddressId || paying">
+            {{ paying ? 'Procesando…' : 'Confirmar pago' }}
           </button>
         </div>
       </div>
@@ -663,7 +668,7 @@
               <p><strong>Estado:</strong> <span :class="getStatusClass(orderDetailMeta.status)">{{ orderDetailMeta.status }}</span></p>
               <p><strong>Forma de pago:</strong> {{ paymentMethodLabel(orderDetailMeta.paymentMethod) }}</p>
               <p v-if="orderDetailMeta.deliveryAddress"><strong>Dirección de entrega:</strong> {{ orderDetailMeta.deliveryAddress }}</p>
-              <p><strong>Total:</strong> ${{ orderDetailMeta.total.toFixed(2) }}</p>
+              <p><strong>Total:</strong> {{ money(orderDetailMeta.total) }}</p>
             </div>
 
             <div v-if="orderDetailProducts.length" class="order-detail-products">
@@ -673,7 +678,7 @@
                   <div class="order-detail-product-title">{{ p.title }}</div>
                   <div class="order-detail-product-company"><i class="fas fa-store"></i> {{ p.companyName || 'Unify' }}</div>
                   <div class="order-detail-product-meta">
-                    Cantidad: <strong>{{ p.qty }}</strong> · ${{ p.unitPrice.toFixed(2) }} c/u
+                    Cantidad: <strong>{{ p.qty }}</strong> · {{ money(p.unitPrice) }} c/u
                   </div>
                 </div>
               </div>
@@ -694,6 +699,22 @@
     <footer>
       © 2026 Unify - Tu tienda en línea | Envíos gratis en compras mayores a $50
     </footer>
+    <!-- Avisos (reemplazan a alert) -->
+    <div class="toast-stack" aria-live="polite">
+      <div v-for="t in toasts" :key="t.id" class="toast-item" :class="'toast-' + t.type">{{ t.message }}</div>
+    </div>
+
+    <!-- Confirmación (reemplaza a confirm) -->
+    <div class="confirm-overlay" v-if="confirmDialog.open" @click.self="resolveConfirm(false)">
+      <div class="confirm-box" role="dialog" aria-modal="true">
+        <p>{{ confirmDialog.message }}</p>
+        <div class="confirm-actions">
+          <button class="btn-outline" @click="resolveConfirm(false)">Cancelar</button>
+          <button class="btn-primary" @click="resolveConfirm(true)">Confirmar</button>
+        </div>
+      </div>
+    </div>
+
     <ChatbotWidget context="cliente" :user-name="userName" :context-data="{ currentView, cartItemCount }" />
   </div>
 </template>
@@ -703,15 +724,30 @@ import { insforge } from '../insforgeClient.js'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import jsPDF from 'jspdf'
+import { markRaw } from 'vue'
 
 // Chatbot 
 import ChatbotWidget from './ChatbotWidget.vue'
+import LangSwitch from './LangSwitch.vue'
+
+// ─── Configuración ───────────────────────────────────────
+// true  = el checkout se hace en la base de datos con la función `place_order` (precios, stock y puntos
+//         los valida el servidor). Si la función todavía no existe, se usa el modo anterior como respaldo.
+const USE_SERVER_CHECKOUT = true
+// Cuenta que se muestra al elegir "Transferencia bancaria". Reemplázala por tu cuenta real.
+const TRANSFER_ACCOUNT = 'Unify Bank - ES91 2100 0418 4502 0005 1332'
+// El estado guardado en `sales` se muestra al cliente con estos nombres
+const STATUS_FROM_DB = { Pendiente: 'En proceso' }
+const IMG_PLACEHOLDER = 'data:image/svg+xml;utf8,' + encodeURIComponent(
+  '<svg xmlns="http://www.w3.org/2000/svg" width="400" height="300"><rect width="400" height="300" fill="#005e59"/><text x="200" y="158" font-family="Arial" font-size="26" fill="#ffffff" text-anchor="middle">Producto</text></svg>'
+)
+const isVisible = () => document.visibilityState === 'visible'
 
 
 export default {
   name: 'ClienteDashboard',
   emits: ['switch-view'],
-  components: { ChatbotWidget },
+  components: { ChatbotWidget, LangSwitch },
   data() {
     return {
       // ─── Usuario ──────────────────────────────
@@ -749,41 +785,22 @@ export default {
       // ─── Carrito ─────────────────────────────
       cart: [],
 
-      // ─── Pedidos (con repartidores) ──────────
-      orders: [
-        {
-          id: '#UNI-4521',
-          date: '15 Dic 2025',
-          total: 45.0,
-          status: 'Entregado',
-          driverId: null,
-          driverName: null
-        },
-        {
-          id: '#UNI-4518',
-          date: '10 Dic 2025',
-          total: 128.0,
-          status: 'Entregado',
-          driverId: null,
-          driverName: null
-        },
-        {
-          id: '#UNI-4512',
-          date: '5 Dic 2025',
-          total: 67.5,
-          status: 'Entregado',
-          driverId: null,
-          driverName: null
-        }
-      ],
+      // ─── Pedidos reales (desde la tabla `sales`) ───
+      orders: [],
+      ordersLoading: false,
+      ordersFetching: false,
+      ordersPollInterval: null,
 
-      // ─── Datos de repartidores (simulados) ──
-      drivers: [
-        { id: 1, name: 'Carlos Martínez', initials: 'CM', zone: 'Zona Sur' },
-        { id: 2, name: 'Ana Rodríguez', initials: 'AR', zone: 'Zona Norte' },
-        { id: 3, name: 'Luis Pérez', initials: 'LP', zone: 'Zona Este' },
-        { id: 4, name: 'María González', initials: 'MG', zone: 'Zona Oeste' }
-      ],
+      // ─── Pago ───
+      paying: false,
+      pendingOrderRef: '',
+      transferAccount: TRANSFER_ACCOUNT,
+
+      // ─── Avisos y confirmaciones ───
+      toasts: [],
+      toastSeq: 0,
+      confirmDialog: { open: false, message: '', resolve: null },
+      secondsTimer: null,
 
       // ─── Modal detalle producto ──────────────
       selectedProduct: null,
@@ -839,7 +856,7 @@ export default {
 
   computed: {
     userInitials() {
-      return this.userName.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2)
+      return this.userName.split(' ').filter(Boolean).map(w => w[0]).join('').toUpperCase().slice(0, 2)
     },
     // ─── Catálogo agrupado por empresa ───
     companiesList() {
@@ -874,8 +891,8 @@ export default {
       if (this.searchQuery.trim()) {
         const q = this.searchQuery.toLowerCase()
         result = result.filter(p =>
-          p.title.toLowerCase().includes(q) ||
-          p.category.toLowerCase().includes(q) ||
+          (p.title || '').toLowerCase().includes(q) ||
+          (p.category || '').toLowerCase().includes(q) ||
           (p.seller && p.seller.toLowerCase().includes(q))
         )
       }
@@ -889,7 +906,8 @@ export default {
       return result
     },
     cartTotal() {
-      return this.cart.reduce((total, item) => total + item.price * item.quantity, 0)
+      const total = this.cart.reduce((sum, item) => sum + (Number(item.price) || 0) * item.quantity, 0)
+      return Math.round(total * 100) / 100
     },
     cartItemCount() {
       return this.cart.reduce((total, item) => total + item.quantity, 0)
@@ -911,14 +929,9 @@ export default {
       return this.orders.find(o => o.id === this.trackingOrderId) || null
     },
     trackingDriver() {
+      // El repartidor real se identifica solo por su ubicación y su chat; no se asignan nombres inventados
       if (!this.trackingOrder) return null
-      if (this.trackingOrder.driverId) {
-        return this.drivers.find(d => d.id === this.trackingOrder.driverId) || null
-      }
-      if (this.trackingOrder.driverName) {
-        return this.drivers.find(d => d.name === this.trackingOrder.driverName) || null
-      }
-      return null
+      return { name: 'Tu repartidor', initials: 'R' }
     },
     currentChatMessages() {
       if (!this.trackingOrderId) return []
@@ -933,25 +946,100 @@ export default {
     }
   },
 
-  mounted() {
-    this.loadUserProfile()
-    this.loadProducts().then(() => this.loadCart())
-    // Actualizar contador del mapa cada segundo (segundos desde la última ubicación real)
-    setInterval(() => {
-      this.mapUpdateSeconds = (this.mapUpdateSeconds % 999) + 1
-    }, 1000)
+  watch: {
+    currentView(view, previous) {
+      if (previous === 'tracking' && view !== 'tracking') this.stopTrackingSession()
+      if (view === 'tracking' && this.trackingOrderId) this.beginTrackingSession()
+      if (view === 'orders' || view === 'tracking') this.loadOrders()
+    },
+  },
+
+  async mounted() {
+    // Perfil y productos en paralelo; el carrito y los pedidos necesitan ambos
+    await Promise.all([this.loadUserProfile(), this.loadProducts()])
+    this.loadCart()
+    this.loadOrders()
+    // Los pedidos se refrescan solos mientras se ven (para ver los cambios de estado de la empresa)
+    this.ordersPollInterval = setInterval(() => {
+      if (isVisible() && (this.currentView === 'orders' || this.currentView === 'tracking')) this.loadOrders()
+    }, 20000)
     // Conectar a InsForge Realtime para recibir la ubicación del repartidor
     this.connectRealtime()
   },
 
   beforeUnmount() {
-    this.disconnectRealtime()
+    this.stopTrackingSession()
     if (this.companyChatPollInterval) clearInterval(this.companyChatPollInterval)
-    if (this.orderChatPollInterval) clearInterval(this.orderChatPollInterval)
-    if (this.driverLocationPollInterval) clearInterval(this.driverLocationPollInterval)
+    if (this.ordersPollInterval) clearInterval(this.ordersPollInterval)
   },
 
   methods: {
+    // ─── Utilidades ───
+    money(n) {
+      return Number(n || 0).toLocaleString('en-US', { style: 'currency', currency: 'USD' })
+    },
+    notify(message, type) {
+      const kind = type || (/^[✅🎉🚀💾]/u.test(message) ? 'success'
+        : /no se pudo|error|ocurri|inicia sesión|selecciona|supera|agotado|no hay más/i.test(message) ? 'error'
+        : 'info')
+      const id = ++this.toastSeq
+      this.toasts.push({ id, message, type: kind })
+      setTimeout(() => { this.toasts = this.toasts.filter((t) => t.id !== id) }, 4500)
+    },
+    askConfirm(message) {
+      return new Promise((resolve) => {
+        this.confirmDialog = { open: true, message, resolve }
+      })
+    },
+    resolveConfirm(result) {
+      const done = this.confirmDialog.resolve
+      this.confirmDialog = { open: false, message: '', resolve: null }
+      if (done) done(result)
+    },
+
+    // ─── Pedidos reales ───
+    async loadOrders() {
+      if (!this.currentUserId || this.ordersFetching) return
+      this.ordersFetching = true
+      if (this.orders.length === 0) this.ordersLoading = true
+      try {
+        const { data, error } = await insforge.database
+          .from('sales')
+          .select('order_ref,unit_price,created_at,status,payment_method')
+          .eq('client_id', this.currentUserId)
+          .order('created_at', { ascending: false })
+        if (error) {
+          console.warn('No se pudieron cargar los pedidos:', error)
+          return
+        }
+        const groups = {}
+        ;(data || []).forEach((row) => {
+          if (!row.order_ref) return
+          if (!groups[row.order_ref]) {
+            groups[row.order_ref] = { id: row.order_ref, total: 0, createdAt: row.created_at, dbStatus: row.status || null, paymentMethod: row.payment_method || null }
+          }
+          const g = groups[row.order_ref]
+          g.total += Number(row.unit_price) || 0
+          if (row.created_at && (!g.createdAt || new Date(row.created_at) < new Date(g.createdAt))) g.createdAt = row.created_at
+        })
+        this.orders = Object.values(groups)
+          .map((g) => ({
+            id: g.id,
+            date: g.createdAt ? new Date(g.createdAt).toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' }) : '',
+            total: Math.round(g.total * 100) / 100,
+            status: STATUS_FROM_DB[g.dbStatus] || g.dbStatus || 'En proceso',
+            paymentMethod: g.paymentMethod,
+            createdAt: g.createdAt,
+          }))
+          .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+      } catch (err) {
+        console.warn('Error inesperado cargando pedidos:', err)
+      } finally {
+        this.ordersFetching = false
+        this.ordersLoading = false
+      }
+    },
+
     // ─── Perfil ────────────────────────────────
     async loadUserProfile() {
       try {
@@ -1005,14 +1093,14 @@ export default {
           .upsert({ id: this.currentUserId, full_name: trimmed })
         if (error) {
           console.warn('No se pudo guardar el nombre:', error)
-          alert('No se pudo guardar tu nombre. Intenta de nuevo.')
+          this.notify('No se pudo guardar tu nombre. Intenta de nuevo.')
           return
         }
         this.userName = trimmed
         this.editingName = false
       } catch (err) {
         console.warn('Error inesperado guardando el nombre:', err)
-        alert('Error inesperado guardando tu nombre.')
+        this.notify('Error inesperado guardando tu nombre.')
       } finally {
         this.savingName = false
       }
@@ -1087,14 +1175,14 @@ export default {
         const { error } = await insforge.database.from('addresses').upsert(payload)
         if (error) {
           console.warn('No se pudo guardar la dirección:', error)
-          alert('No se pudo guardar la dirección. Intenta de nuevo.')
+          this.notify('No se pudo guardar la dirección. Intenta de nuevo.')
           return
         }
         this.showAddressModal = false
         await this.loadAddresses()
       } catch (err) {
         console.warn('Error inesperado guardando la dirección:', err)
-        alert('Error inesperado guardando la dirección.')
+        this.notify('Error inesperado guardando la dirección.')
       } finally {
         this.savingAddress = false
       }
@@ -1112,7 +1200,7 @@ export default {
       }
     },
     async deleteAddress(address) {
-      if (!confirm(`¿Eliminar la dirección "${address.label}"?`)) return
+      if (!(await this.askConfirm(`¿Eliminar la dirección "${address.label}"?`))) return
       try {
         const { error } = await insforge.database.from('addresses').delete().eq('id', address.id)
         if (error) {
@@ -1133,15 +1221,15 @@ export default {
       if (!file) return
 
       if (!file.type.startsWith('image/')) {
-        alert('Por favor selecciona un archivo de imagen.')
+        this.notify('Por favor selecciona un archivo de imagen.')
         return
       }
       if (file.size > 3 * 1024 * 1024) {
-        alert('La imagen debe pesar menos de 3MB.')
+        this.notify('La imagen debe pesar menos de 3MB.')
         return
       }
       if (!this.currentUserId) {
-        alert('Inicia sesión de nuevo para poder actualizar tu foto.')
+        this.notify('Inicia sesión de nuevo para poder actualizar tu foto.')
         return
       }
 
@@ -1155,7 +1243,7 @@ export default {
           .upload(key, file)
 
         if (uploadError) {
-          alert('No se pudo subir la imagen: ' + (uploadError.message || 'error desconocido'))
+          this.notify('No se pudo subir la imagen: ' + (uploadError.message || 'error desconocido'))
           return
         }
 
@@ -1170,14 +1258,14 @@ export default {
           .eq('id', this.currentUserId)
 
         if (dbError) {
-          alert('La imagen se subió, pero no se pudo guardar en tu perfil: ' + (dbError.message || ''))
+          this.notify('La imagen se subió, pero no se pudo guardar en tu perfil: ' + (dbError.message || ''))
           return
         }
 
         this.avatarUrl = fullUrl
       } catch (err) {
         console.error('Error subiendo la foto de perfil:', err)
-        alert('Ocurrió un error inesperado subiendo la foto.')
+        this.notify('Ocurrió un error inesperado subiendo la foto.')
       } finally {
         this.avatarUploading = false
       }
@@ -1186,11 +1274,11 @@ export default {
     // ─── Chat real con la empresa (InsForge) ─────
     openCompanyChat(product) {
       if (!product?.sellerId) {
-        alert('No se pudo identificar a la empresa vendedora de este producto.')
+        this.notify('No se pudo identificar a la empresa vendedora de este producto.')
         return
       }
       if (!this.currentUserId) {
-        alert('Inicia sesión de nuevo para poder chatear con la empresa.')
+        this.notify('Inicia sesión de nuevo para poder chatear con la empresa.')
         return
       }
       this.companyChat.companyId = product.sellerId
@@ -1202,7 +1290,7 @@ export default {
       this.loadCompanyChatMessages()
       if (this.companyChatPollInterval) clearInterval(this.companyChatPollInterval)
       this.companyChatPollInterval = setInterval(() => {
-        this.loadCompanyChatMessages()
+        if (isVisible()) this.loadCompanyChatMessages()
       }, 4000)
     },
 
@@ -1256,13 +1344,13 @@ export default {
           text,
         }])
         if (error) {
-          alert('No se pudo enviar el mensaje: ' + (error.message || 'error desconocido'))
+          this.notify('No se pudo enviar el mensaje: ' + (error.message || 'error desconocido'))
           return
         }
         await this.loadCompanyChatMessages()
       } catch (err) {
         console.warn('Error inesperado enviando mensaje:', err)
-        alert('Error inesperado enviando el mensaje.')
+        this.notify('Error inesperado enviando el mensaje.')
       } finally {
         this.companyChat.loading = false
       }
@@ -1380,6 +1468,16 @@ export default {
           .map((row) => {
             const product = this.products.find((p) => p.id === row.product_id)
             if (!product) return null // producto pausado/eliminado desde que se agregó
+            const stock = Number(product.stock) || 0
+            if (stock <= 0) {
+              // Sin stock: se quita también de la base de datos para no bloquear el pago
+              insforge.database.from('cart_items').delete().eq('client_id', this.currentUserId).eq('product_id', row.product_id)
+              return null
+            }
+            if (row.quantity > stock) {
+              insforge.database.from('cart_items').update({ quantity: stock }).eq('client_id', this.currentUserId).eq('product_id', row.product_id)
+              return { ...product, quantity: stock }
+            }
             return { ...product, quantity: row.quantity }
           })
           .filter(Boolean)
@@ -1390,15 +1488,15 @@ export default {
 
     async addToCart(product) {
       if (!this.currentUserId) {
-        alert('Inicia sesión de nuevo para agregar productos al carrito.')
+        this.notify('Inicia sesión de nuevo para agregar productos al carrito.')
         return
       }
-
+      const stock = Number(product.stock) || 0
       const existing = this.cart.find((item) => item.id === product.id)
 
       if (existing) {
-        if (existing.quantity >= product.stock) {
-          alert('No hay más stock disponible de este producto.')
+        if (existing.quantity >= stock) {
+          this.notify('No hay más stock disponible de este producto.')
           return
         }
         existing.quantity++
@@ -1408,15 +1506,17 @@ export default {
             .update({ quantity: existing.quantity })
             .eq('client_id', this.currentUserId)
             .eq('product_id', product.id)
-          if (error) console.warn('No se pudo actualizar la cantidad en el carrito:', error)
+          if (error) throw error
         } catch (err) {
-          console.warn('Error inesperado actualizando el carrito:', err)
+          existing.quantity--
+          console.warn('No se pudo actualizar la cantidad en el carrito:', err)
+          this.notify('No se pudo actualizar el carrito. Intenta de nuevo.')
         }
         return
       }
 
-      if (product.stock <= 0) {
-        alert('Este producto está agotado.')
+      if (stock <= 0) {
+        this.notify('Este producto está agotado.')
         return
       }
 
@@ -1427,14 +1527,16 @@ export default {
           product_id: product.id,
           quantity: 1,
         }])
-        if (error) console.warn('No se pudo guardar el producto en el carrito:', error)
+        if (error) throw error
       } catch (err) {
-        console.warn('Error inesperado guardando el carrito:', err)
+        this.cart = this.cart.filter((i) => i.id !== product.id)
+        console.warn('No se pudo guardar el producto en el carrito:', err)
+        this.notify('No se pudo agregar el producto al carrito. Intenta de nuevo.')
       }
     },
 
     async incrementQty(item) {
-      if (item.quantity >= item.stock) return
+      if (item.quantity >= (Number(item.stock) || 0)) return
       item.quantity++
       try {
         const { error } = await insforge.database
@@ -1442,9 +1544,11 @@ export default {
           .update({ quantity: item.quantity })
           .eq('client_id', this.currentUserId)
           .eq('product_id', item.id)
-        if (error) console.warn('No se pudo actualizar la cantidad:', error)
+        if (error) throw error
       } catch (err) {
-        console.warn('Error inesperado actualizando cantidad:', err)
+        item.quantity--
+        console.warn('No se pudo actualizar la cantidad:', err)
+        this.notify('No se pudo actualizar la cantidad. Intenta de nuevo.')
       }
     },
 
@@ -1460,9 +1564,11 @@ export default {
           .update({ quantity: item.quantity })
           .eq('client_id', this.currentUserId)
           .eq('product_id', item.id)
-        if (error) console.warn('No se pudo actualizar la cantidad:', error)
+        if (error) throw error
       } catch (err) {
-        console.warn('Error inesperado actualizando cantidad:', err)
+        item.quantity++
+        console.warn('No se pudo actualizar la cantidad:', err)
+        this.notify('No se pudo actualizar la cantidad. Intenta de nuevo.')
       }
     },
 
@@ -1552,11 +1658,11 @@ export default {
 
     async submitRating() {
       if (!this.myRatingStars) {
-        alert('Selecciona al menos 1 estrella antes de enviar tu calificación.')
+        this.notify('Selecciona al menos 1 estrella antes de enviar tu calificación.')
         return
       }
       if (!this.currentUserId) {
-        alert('Inicia sesión de nuevo para poder calificar este producto.')
+        this.notify('Inicia sesión de nuevo para poder calificar este producto.')
         return
       }
       if (!this.selectedProduct?.id) return
@@ -1584,17 +1690,17 @@ export default {
         }
 
         if (error) {
-          alert('No se pudo guardar tu calificación: ' + (error.message || 'error desconocido'))
+          this.notify('No se pudo guardar tu calificación: ' + (error.message || 'error desconocido'))
           return
         }
 
         this.hasExistingRating = true
         await this.loadRealRatingsForProducts()
         await this.loadProductReviewsList(this.selectedProduct.id)
-        alert('¡Gracias por tu calificación!')
+        this.notify('¡Gracias por tu calificación!')
       } catch (err) {
         console.warn('Error inesperado guardando calificación:', err)
-        alert('Error inesperado guardando tu calificación.')
+        this.notify('Error inesperado guardando tu calificación.')
       } finally {
         this.submittingRating = false
       }
@@ -1627,6 +1733,7 @@ export default {
       this.showCheckoutModal = true
       this.selectedPayment = null
       this.pointsToRedeem = 0
+      this.pendingOrderRef = this.generateOrderRef() // se muestra en "Transferencia" y es la misma que usa el pedido en modo respaldo
     },
     closeCheckoutModal() {
       this.showCheckoutModal = false
@@ -1636,62 +1743,113 @@ export default {
       this.selectedPayment = method
     },
     generateOrderRef() {
-      return 'UNI-' + Date.now().toString().slice(-6)
+      // 8 caracteres aleatorios (sin letras confusas). Antes se usaban los últimos 6 dígitos de la hora,
+      // que se repiten cada ~17 minutos y podían mezclar dos pedidos distintos.
+      const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
+      const bytes = new Uint8Array(8)
+      crypto.getRandomValues(bytes)
+      return 'UNI-' + Array.from(bytes, (b) => chars[b % chars.length]).join('')
     },
-    async confirmPayment() {
-      if (!this.selectedPayment) return
 
+    async confirmPayment() {
+      if (!this.selectedPayment || this.paying || this.cart.length === 0) return
+      this.paying = true
+      try {
+        let result
+        if (USE_SERVER_CHECKOUT) {
+          result = await this.placeOrderOnServer()
+          if (result === 'fallback') result = await this.placeOrderFromClient()
+        } else {
+          result = await this.placeOrderFromClient()
+        }
+        if (!result) return // el aviso de error ya se mostró y el carrito sigue intacto
+
+        if (typeof result.points_balance === 'number') this.userPoints = result.points_balance
+        const paymentLabels = { card: 'tarjeta', paypal: 'PayPal', transfer: 'transferencia bancaria', cash: 'efectivo contra entrega' }
+        this.notify(`🎉 ¡Pedido ${result.order_ref} confirmado! Total: ${this.money(result.total)}. Forma de pago: ${paymentLabels[this.selectedPayment] || this.selectedPayment}.`)
+
+        this.cart = []
+        this.pointsToRedeem = 0
+        this.closeCheckoutModal()
+        await Promise.all([this.loadOrders(), this.loadProducts()])
+      } finally {
+        this.paying = false
+      }
+    },
+
+    // Checkout en el servidor: la función place_order calcula el total con los precios reales, valida el
+    // stock, canjea los puntos, registra la venta, descuenta el stock y vacía el carrito en una sola transacción.
+    async placeOrderOnServer() {
+      try {
+        const { data, error } = await insforge.database.rpc('place_order', {
+          p_payment_method: this.selectedPayment,
+          p_address_id: this.selectedAddressId || null,
+          p_points_blocks: this.pointsToRedeem,
+          p_client_name: this.userName,
+        })
+        if (error) {
+          const text = `${error.message || ''} ${error.code || ''}`
+          if (/PGRST202|42883/.test(text) || (/place_order/i.test(text) && /(could not find|does not exist|not found)/i.test(text))) {
+            console.warn('La función place_order no existe todavía: se usa el modo de respaldo (menos seguro).')
+            return 'fallback'
+          }
+          this.notify(error.message || 'No se pudo completar la compra. Intenta de nuevo.')
+          // El stock o el carrito pudieron cambiar: se vuelven a cargar
+          await this.loadProducts()
+          await this.loadCart()
+          return null
+        }
+        const row = Array.isArray(data) ? data[0] : data
+        const result = row && row.place_order ? row.place_order : row
+        if (!result || !result.order_ref) {
+          this.notify('No se pudo confirmar el pedido. Revisa "Mis pedidos" antes de intentar de nuevo.')
+          await this.loadOrders()
+          return null
+        }
+        return result
+      } catch (err) {
+        console.warn('Error inesperado en el checkout:', err)
+        this.notify('Error inesperado al procesar la compra. Revisa "Mis pedidos" antes de intentar de nuevo.')
+        return null
+      }
+    },
+
+    // Modo de respaldo (si la función place_order no existe). El cálculo lo hace el navegador y el descuento de
+    // stock/puntos depende de los permisos de la tabla, por eso se recomienda crear place_order.
+    async placeOrderFromClient() {
       const totalPaid = this.finalCheckoutTotal
       const pointsUsed = this.pointsToRedeem * 100
       const pointsEarned = Math.floor(totalPaid)
+      const orderRef = this.pendingOrderRef || this.generateOrderRef()
+      const chosenAddress = this.addresses.find((a) => a.id === this.selectedAddressId)
+      const deliveryAddressText = chosenAddress ? `${chosenAddress.street}, ${chosenAddress.city}` : null
 
-      const paymentLabels = { card: 'tarjeta', paypal: 'PayPal', transfer: 'transferencia bancaria', cash: 'efectivo contra entrega' }
-      alert(`🎉 ¡Pago exitoso! Has pagado $${totalPaid.toFixed(2)} con ${paymentLabels[this.selectedPayment] || this.selectedPayment}.`)
-      // Crear nuevo pedido
-      const newOrder = {
-        id: this.generateOrderRef(),
-        date: new Date().toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' }),
-        total: totalPaid,
-        status: 'En proceso',
-        driverId: null,
-        driverName: null,
-        paymentMethod: this.selectedPayment
+      // 1) Registrar la venta. Si falla, NO se cobra ni se vacía el carrito.
+      const saved = await this.registerSale(orderRef, this.selectedPayment, deliveryAddressText)
+      if (!saved) {
+        this.notify('No se pudo registrar tu compra. No se realizó ningún cobro. Intenta de nuevo.')
+        return null
       }
-      const randomDriver = this.drivers[Math.floor(Math.random() * this.drivers.length)]
-      newOrder.driverId = randomDriver.id
-      newOrder.driverName = randomDriver.name
-
-      this.orders.unshift(newOrder)
-
-      // ─ Actualizar puntos reales en InsForge (ganar - canjeados) ─
+      // 2) Stock
+      await this.updateStockAfterSale()
+      // 3) Puntos
+      let balance = this.userPoints
       if (this.currentUserId) {
-        const newPointsBalance = this.userPoints - pointsUsed + pointsEarned
+        const newBalance = this.userPoints - pointsUsed + pointsEarned
         try {
-          const { error } = await insforge.database.from('profiles').update({ points: newPointsBalance }).eq('id', this.currentUserId)
-          if (!error) {
-            this.userPoints = newPointsBalance
-          } else {
-            console.warn('No se pudieron actualizar los puntos:', error)
-          }
+          const { error } = await insforge.database.from('profiles').update({ points: newBalance }).eq('id', this.currentUserId)
+          if (!error) balance = newBalance
+          else console.warn('No se pudieron actualizar los puntos:', error)
         } catch (err) {
           console.warn('Error actualizando puntos:', err)
         }
       }
-
-      // ─ Registrar la venta real (para reportes de la empresa) y descontar stock ─
-      const chosenAddress = this.addresses.find((a) => a.id === this.selectedAddressId)
-      const deliveryAddressText = chosenAddress ? `${chosenAddress.street}, ${chosenAddress.city}` : null
-      await this.registerSaleAndUpdateStock(newOrder.id, this.selectedPayment, deliveryAddressText)
-
-      this.pointsToRedeem = 0
       await this.clearCart()
-      this.closeCheckoutModal()
+      return { order_ref: orderRef, total: totalPaid, points_balance: balance }
     },
 
-    async registerSaleAndUpdateStock(orderRef, paymentMethod, deliveryAddress) {
-      if (this.cart.length === 0) return
-
-      // 1) Una fila por UNIDAD vendida (respetando cantidad), para reportes reales
+    async registerSale(orderRef, paymentMethod, deliveryAddress) {
+      // Una fila por UNIDAD vendida (respetando la cantidad), para reportes reales
       const saleRows = []
       this.cart.forEach((item) => {
         for (let i = 0; i < item.quantity; i++) {
@@ -1712,20 +1870,24 @@ export default {
           })
         }
       })
-
       try {
         const { error } = await insforge.database.from('sales').insert(saleRows)
-        if (error) console.warn('No se pudo registrar la venta:', error)
+        if (error) {
+          console.warn('No se pudo registrar la venta:', error)
+          return false
+        }
+        return true
       } catch (err) {
         console.warn('Error inesperado registrando la venta:', err)
+        return false
       }
+    },
 
-      // 2) Descontar stock real según la cantidad comprada de cada producto
+    async updateStockAfterSale() {
       const qtyByProduct = {}
       this.cart.forEach((item) => {
         qtyByProduct[item.id] = (qtyByProduct[item.id] || 0) + item.quantity
       })
-
       for (const [productId, qty] of Object.entries(qtyByProduct)) {
         const cachedProduct = this.products.find((p) => p.id === productId)
         if (!cachedProduct || typeof cachedProduct.stock !== 'number') continue
@@ -1838,7 +2000,7 @@ export default {
         doc.text(String(p.title).slice(0, 32), 14, y)
         doc.text(String(p.companyName || 'Unify').slice(0, 22), 90, y)
         doc.text(String(p.qty), 145, y)
-        doc.text(`$${(p.unitPrice * p.qty).toFixed(2)}`, 165, y)
+        doc.text(this.money(p.unitPrice * p.qty), 165, y)
         y += 7
       })
 
@@ -1846,7 +2008,7 @@ export default {
       doc.line(14, y, 196, y)
       y += 10
       doc.setFontSize(13)
-      doc.text(`Total: $${meta.total.toFixed(2)}`, 145, y)
+      doc.text(`Total: ${this.money(this.orderDetailProducts.reduce((sum, p) => sum + p.unitPrice * p.qty, 0))}`, 145, y)
 
       doc.save(`Factura-${meta.id}.pdf`)
     },
@@ -1862,59 +2024,63 @@ export default {
 
     // ─── Seguimiento (Tracking) ──────────────────
     startTracking(orderId) {
-      console.log('Iniciando tracking para', orderId)
       this.trackingOrderId = orderId
-      this.currentView = 'tracking'
       this.driverRealPosition = null
       this.mapUpdateSeconds = 0
+      if (this.currentView === 'tracking') this.beginTrackingSession()
+      else this.currentView = 'tracking' // el observador de currentView inicia la sesión
+    },
 
-      const order = this.orders.find(o => o.id === orderId)
-      if (!order) {
-        console.warn('Pedido no encontrado')
-        return
-      }
+    // Inicia el chat, la ubicación y el mapa del pedido en seguimiento
+    beginTrackingSession() {
+      this.stopTrackingSession()
+      const order = this.trackingOrder
+      if (!order) return
+      this.mapUpdateSeconds = 0
 
-      // Si no tiene conductor, asignar uno aleatorio
-      if (!order.driverName) {
-        const randomDriver = this.drivers[Math.floor(Math.random() * this.drivers.length)]
-        order.driverId = randomDriver.id
-        order.driverName = randomDriver.name
-      }
-
-      // Cargar el chat real de este pedido (mensajes guardados en InsForge)
-      // y empezar a refrescarlo periódicamente mientras la vista de tracking esté abierta.
-      this.loadOrderChatMessages(orderId)
-      if (this.orderChatPollInterval) clearInterval(this.orderChatPollInterval)
+      this.loadOrderChatMessages(order.id)
       this.orderChatPollInterval = setInterval(() => {
-        this.loadOrderChatMessages(this.trackingOrderId)
+        if (isVisible()) this.loadOrderChatMessages(this.trackingOrderId)
       }, 4000)
 
-      // Consultar la ubicación real del repartidor cada pocos segundos.
-      // (Más confiable que depender de un push de Realtime cuya sintaxis
-      // exacta no pudimos confirmar contra tu versión del SDK.)
       this.loadDriverLocation(this.trackingToken)
-      if (this.driverLocationPollInterval) clearInterval(this.driverLocationPollInterval)
       this.driverLocationPollInterval = setInterval(() => {
-        this.loadDriverLocation(this.trackingToken)
+        if (isVisible()) this.loadDriverLocation(this.trackingToken)
       }, 3000)
 
-      // Suscribirse al canal de este pedido para recibir su ubicación en vivo
-      this.subscribeToOrderChannel(this.trackingToken)
+      // Contador "Actualizado hace Ns": solo corre mientras se ve el seguimiento
+      this.secondsTimer = setInterval(() => {
+        this.mapUpdateSeconds = Math.min(this.mapUpdateSeconds + 1, 999)
+      }, 1000)
 
-      this.$nextTick(() => {
-        this.initLeafletMap()
-      })
+      this.subscribeToOrderChannel(this.trackingToken)
+      this.$nextTick(() => this.initLeafletMap())
+    },
+
+    // Detiene todo lo anterior al salir de la pestaña de seguimiento
+    stopTrackingSession() {
+      if (this.orderChatPollInterval) { clearInterval(this.orderChatPollInterval); this.orderChatPollInterval = null }
+      if (this.driverLocationPollInterval) { clearInterval(this.driverLocationPollInterval); this.driverLocationPollInterval = null }
+      if (this.secondsTimer) { clearInterval(this.secondsTimer); this.secondsTimer = null }
+      this.disconnectRealtime()
+      if (this.leafletMap) {
+        this.leafletMap.remove()
+        this.leafletMap = null
+        this.driverMarker = null
+      }
     },
 
     // ─── Ubicación real del repartidor (consultando driver_locations) ───
     async loadDriverLocation(token) {
       if (!token) return
       try {
-        const { data, error } = await insforge.database
+        let query = insforge.database
           .from('driver_locations')
           .select('*')
           .eq('order_id', token)
           .order('created_at', { ascending: false })
+        if (typeof query.limit === 'function') query = query.limit(1)
+        const { data, error } = await query
 
         if (error) {
           console.warn('No se pudo consultar la ubicación del repartidor:', error)
@@ -1936,6 +2102,9 @@ export default {
       try {
         await insforge.realtime.connect()
         insforge.realtime.on('location_update', (data) => {
+          const incomingOrder = data && (data.order_id ?? data.orderId)
+          if (incomingOrder && incomingOrder !== this.trackingToken) return // es de otro pedido
+          if (this.currentView !== 'tracking') return
           if (data && typeof data.lat === 'number' && typeof data.lng === 'number') {
             this.driverRealPosition = { lat: data.lat, lng: data.lng }
             this.mapUpdateSeconds = 0
@@ -1976,7 +2145,7 @@ export default {
       if (!mapEl) return
 
       const defaultCenter = [13.6929, -89.2182] // San Salvador, El Salvador
-      this.leafletMap = L.map(mapEl).setView(defaultCenter, 13)
+      this.leafletMap = markRaw(L.map(mapEl).setView(defaultCenter, 13))
 
       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
@@ -2002,7 +2171,7 @@ export default {
           iconSize: [30, 30],
           iconAnchor: [15, 15],
         })
-        this.driverMarker = L.marker([lat, lng], { icon: truckIcon }).addTo(this.leafletMap)
+        this.driverMarker = markRaw(L.marker([lat, lng], { icon: truckIcon }).addTo(this.leafletMap))
       } else {
         this.driverMarker.setLatLng([lat, lng])
       }
@@ -2044,7 +2213,7 @@ export default {
       const msg = this.chatInputMsg.trim()
       if (!msg) return
       if (!this.trackingOrderId) {
-        alert('No hay pedido en seguimiento. Por favor, selecciona un pedido.')
+        this.notify('No hay pedido en seguimiento. Por favor, selecciona un pedido.')
         return
       }
 
@@ -2061,13 +2230,13 @@ export default {
         }])
 
         if (error) {
-          alert('No se pudo enviar el mensaje: ' + (error.message || 'error desconocido'))
+          this.notify('No se pudo enviar el mensaje: ' + (error.message || 'error desconocido'))
           return
         }
         await this.loadOrderChatMessages(orderId)
       } catch (err) {
         console.warn('Error inesperado enviando el mensaje:', err)
-        alert('Error inesperado enviando el mensaje.')
+        this.notify('Error inesperado enviando el mensaje.')
       }
     },
 
@@ -2080,7 +2249,8 @@ export default {
 
     // ─── Imágenes ──────────────────────────────
     handleImageError(event) {
-      event.target.src = 'https://via.placeholder.com/400x300/005e59/ffffff?text=Producto'
+      event.target.onerror = null // evita bucles si la imagen de respaldo también falla
+      event.target.src = IMG_PLACEHOLDER
     },
 
     // ─── Cerrar sesión ─────────────────────────
@@ -3491,4 +3661,29 @@ footer {
     padding: 1.2rem;
   }
 }
+
+/* ══════════════════════════════════════════
+   AVISOS (toast) Y CONFIRMACIÓN
+══════════════════════════════════════════ */
+.toast-stack {
+  position: fixed; right: 1rem; bottom: 1rem; z-index: 3000;
+  display: flex; flex-direction: column; gap: .5rem; max-width: min(380px, calc(100vw - 2rem));
+}
+.toast-item {
+  background: var(--text-dark); color: #fff; padding: .75rem 1rem; border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lg); font-size: .9rem; line-height: 1.4; white-space: pre-line;
+  border-left: 4px solid var(--sky-400);
+}
+.toast-success { border-left-color: var(--green-400); }
+.toast-error { border-left-color: #dc2626; }
+.confirm-overlay {
+  position: fixed; inset: 0; z-index: 3100; background: rgba(0, 0, 0, .45);
+  display: flex; align-items: center; justify-content: center; padding: 1rem;
+}
+.confirm-box {
+  background: #fff; border-radius: var(--radius-lg); padding: 1.5rem; width: min(420px, 100%);
+  box-shadow: var(--shadow-lg);
+}
+.confirm-box p { color: var(--text-dark); margin-bottom: 1.25rem; line-height: 1.5; }
+.confirm-actions { display: flex; justify-content: flex-end; gap: .5rem; }
 </style>

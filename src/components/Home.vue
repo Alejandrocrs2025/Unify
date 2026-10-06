@@ -199,11 +199,8 @@
         <h2 style="margin:0.5rem 0;">Síguenos en redes sociales</h2>
         <p>Conecta con otras empresas, clientes y mantente al día de nuevas funcionalidades.</p>
         <div class="social-grid">
-          <a href="#" class="social-card"><span class="social-icon"><i class="fab fa-instagram"></i></span> Instagram @Unify</a>
-          <a href="#" class="social-card"><span class="social-icon"><i class="fab fa-facebook-f"></i></span> Facebook Unify</a>
-          <a href="#" class="social-card"><span class="social-icon"><i class="fab fa-linkedin-in"></i></span> LinkedIn Unify Business</a>
-          <a href="#" class="social-card"><span class="social-icon"><i class="fab fa-x-twitter"></i></span> X (Unify)</a>
-          <a href="#" class="social-card"><span class="social-icon"><i class="fab fa-tiktok"></i></span> TikTok Unify</a>
+          <a href="https://www.instagram.com/unifyelsalvador/" class="social-card"><span class="social-icon"><i class="fab fa-instagram"></i></span> Instagram @Unify</a>
+
         </div>
       </div>
     </section>
@@ -274,6 +271,7 @@
           Uni<span style="color:var(--sky-400)">fy</span>
           </a>
           <p>Plataforma integral para empresas de logística y distribución.</p>
+          <p><a href="mailto:aunifyelsalvador@gmail.com">unifyelsalvador@gmail.com</a></p>
         </div>
         <div class="footer-col">
           <h4>Producto</h4>
