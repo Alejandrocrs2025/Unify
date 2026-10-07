@@ -80,3 +80,18 @@ body > .skiptranslate,
 .VIpgJd-ZVi9od-ORHb-OEVmcd { display: none !important; visibility: hidden !important; }
 
 html, body { top: 0 !important; position: static !important; }
+
+/* Los botones y menús no deben resaltar su texto al hacer clic */
+button,
+button *,
+.sub-nav-btn,
+.sub-nav-btn *,
+.navbar li,
+.navbar li *,
+.btn,
+.btn *,
+[role="button"] {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}

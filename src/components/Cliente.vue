@@ -730,6 +730,11 @@ import { markRaw } from 'vue'
 import ChatbotWidget from './ChatbotWidget.vue'
 import LangSwitch from './LangSwitch.vue'
 
+import { readSubView, markSubView, pushSubView, onSubViewChange } from '../viewHistory.js'
+
+// Secciones de esta pantalla (para que Atrás/Adelante del navegador funcionen entre ellas)
+const CLIENTE_VIEWS = ['home', 'products', 'orders', 'tracking', 'profile']
+
 // ─── Configuración ───────────────────────────────────────
 // true  = el checkout se hace en la base de datos con la función `place_order` (precios, stock y puntos
 //         los valida el servidor). Si la función todavía no existe, se usa el modo anterior como respaldo.
@@ -951,8 +956,38 @@ export default {
       if (previous === 'tracking' && view !== 'tracking') this.stopTrackingSession()
       if (view === 'tracking' && this.trackingOrderId) this.beginTrackingSession()
       if (view === 'orders' || view === 'tracking') this.loadOrders()
+      pushSubView('cliente', view) // ← línea nueva
     },
   },
+
+    created() {
+    const restored = readSubView('cliente', CLIENTE_VIEWS)
+    if (restored && restored !== 'tracking') this.currentView = restored
+    markSubView('cliente', this.currentView)
+    this.offHistory = onSubViewChange('cliente', CLIENTE_VIEWS, (sub) => {
+      let next = sub
+      if (next === 'tracking' && !this.trackingOrderId) {
+        next = 'orders'
+        markSubView('cliente', next)
+      }
+      this.currentView = next
+    })
+  },
+
+    created() {
+    const restored = readSubView('cliente', CLIENTE_VIEWS)
+    if (restored && restored !== 'tracking') this.currentView = restored
+    markSubView('cliente', this.currentView)
+    this.offHistory = onSubViewChange('cliente', CLIENTE_VIEWS, (sub) => {
+      let next = sub
+      if (next === 'tracking' && !this.trackingOrderId) {
+        next = 'orders'
+        markSubView('cliente', next)
+      }
+      this.currentView = next
+    })
+  },
+
 
   async mounted() {
     // Perfil y productos en paralelo; el carrito y los pedidos necesitan ambos
@@ -968,6 +1003,7 @@ export default {
   },
 
   beforeUnmount() {
+    if (this.offHistory) this.offHistory()
     this.stopTrackingSession()
     if (this.companyChatPollInterval) clearInterval(this.companyChatPollInterval)
     if (this.ordersPollInterval) clearInterval(this.ordersPollInterval)

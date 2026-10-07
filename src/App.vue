@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import Home from './components/Home.vue'
 import Login from './components/Login.vue'
 import Register from './components/Register.vue'
@@ -9,6 +9,8 @@ import Empresa from './components/Empresa.vue'
 import CompanyDetails from './components/CompanyDetails.vue'
 import Repartidor from './components/Repartidor.vue'
 import { checkSessionAndGetView } from './authHelpers.js'
+import { insforge } from './insforgeClient.js'
+import { createViewNavigator } from './viewHistory.js'
 
 // Ruta pública sin login: /repartidor/:orderId
 const repartidorMatch = window.location.pathname.match(/^\/repartidor\/(.+)$/)
@@ -26,11 +28,27 @@ const components = {
   empresa: Empresa,
   'empresa-details': CompanyDetails,
 }
-const switchView = (view) => {
-  const normalized = view?.toLowerCase?.() ?? view
-  console.log('Cambiando vista a:', normalized)
-  if (components[normalized]) currentView.value = normalized
+
+// ¿Hay una sesión activa ahora mismo? (solo true/false; es la comprobación ligera que usan Atrás/Adelante)
+const hasSession = async () => {
+  try {
+    const { data, error } = await insforge.auth.getCurrentUser()
+    return !error && !!data?.user
+  } catch (e) {
+    return false
+  }
 }
+
+// Navegación con historial: cada cambio de pantalla queda registrado en el navegador, así que los botones
+// Atrás / Adelante (y el gesto de atrás del celular) funcionan. Ver src/viewHistory.js.
+const nav = createViewNavigator({
+  views: Object.keys(components),
+  getView: () => currentView.value,
+  setView: (view) => { currentView.value = view },
+  hasSession,
+  getSessionView: checkSessionAndGetView,
+})
+const switchView = nav.switchView
 
 // Se ejecuta una sola vez al cargar la app (por ejemplo, justo después de
 // volver de Google/GitHub tras el login con OAuth). Si hay sesión activa,
@@ -40,12 +58,16 @@ onMounted(async () => {
     checkingSession.value = false
     return
   }
+  window.addEventListener('popstate', nav.onPopState)
   try {
-    const nextView = await checkSessionAndGetView()
-    if (nextView) currentView.value = nextView
+    await nav.init()
   } finally {
     checkingSession.value = false
   }
+})
+
+onBeforeUnmount(() => {
+  window.removeEventListener('popstate', nav.onPopState)
 })
 </script>
 

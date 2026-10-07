@@ -1390,6 +1390,11 @@ import 'leaflet/dist/leaflet.css'
 import ChatbotWidget from './ChatbotWidget.vue'
 import LangSwitch from './LangSwitch.vue'
 
+import { readSubView, markSubView, pushSubView, onSubViewChange } from '../viewHistory.js'
+
+// Secciones de esta pantalla (para que Atrás/Adelante del navegador funcionen entre ellas)
+const EMPRESA_VIEWS = ['dashboard', 'catalog', 'orders', 'clients', 'inventory', 'fleet', 'messages', 'reports', 'settings']
+
 // ─── Helpers ─────────────────────────────────────────────
 // Pon en true cuando la tabla `products` tenga estas columnas:
 //   subcategory text, brand text, sku text, original_price numeric, min_stock int,
@@ -2053,7 +2058,11 @@ export default {
     },
   },
 
-  watch: {
+    watch: {
+    currentView(view) {
+      pushSubView('empresa', view)
+    },
+
     // showFleetMap ahora devuelve dónde se debe mostrar el mapa ('fleet' | 'messages' | false)
     // en vez de un simple booleano: así, si se navega directo de una pestaña con mapa a la
     // otra (ambas "true"), el watcher igual detecta el cambio de valor y reconstruye el mapa
@@ -2068,6 +2077,10 @@ export default {
 
   created() {
     this.userIdPromise = null // no reactivo: evita pedir el usuario varias veces a la vez
+    const restored = readSubView('empresa', EMPRESA_VIEWS)
+    if (restored) this.currentView = restored
+    markSubView('empresa', this.currentView)
+    this.offHistory = onSubViewChange('empresa', EMPRESA_VIEWS, (sub) => { this.currentView = sub })
   },
 
   mounted() { 
@@ -2092,6 +2105,7 @@ export default {
   },
 
   beforeUnmount() {
+    if (this.offHistory) this.offHistory()
     document.removeEventListener('click', this.closeProfileMenuOutside)
     document.removeEventListener('click', this.closeNotificationsOutside)
     if (this.conversationsPollInterval) clearInterval(this.conversationsPollInterval)
